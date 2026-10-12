@@ -1,0 +1,234 @@
+# BUILD BRIEF: "Sunway Hub" – an unofficial, non-commercial study resources and campus events website for Sunway University students
+
+You are a senior full-stack engineer. Build the complete website described below. Work in phases (see "Build order"), run tests after each phase, and summarise what you built before moving on. If something is ambiguous, pick the safer and simpler option and list it under "Assumptions" at the end instead of stopping to ask.
+
+## 1. What this is
+- A closed, members-only website for the Sunway University community (students, teachers, staff) to share study notes, find club info, and see campus events.
+- It is a student-run, UNOFFICIAL project. It is NOT affiliated with or endorsed by Sunway University. Show this disclaimer in the footer of every page and in the Terms.
+- It is strictly NON-COMMERCIAL. No ads, no payments, no donations, no sponsorships, no paid features, no marketplace, no affiliate links, and no third-party tracking or analytics. The owner is an international student on a Malaysian student pass, so any income-generating feature is forbidden. Do not add any, even as a placeholder.
+- Language: English only. No language switcher, no i18n framework.
+- Do not use the Sunway logo, brand colours or mascots anywhere. Use a plain text wordmark "Sunway Hub".
+
+## 2. Infrastructure: VERCEL AND NEON ONLY
+Use only these two platforms. Do NOT use or suggest Supabase, Firebase, AWS services directly, Upstash/Redis, Cloudflare, Resend, Sentry, or any other hosted service.
+- Hosting and server: Vercel (Hobby plan, which is for non-commercial use). Next.js (App Router) + TypeScript + Tailwind CSS. Set the function region to Singapore (sin1) if available, to stay close to Malaysia.
+- Database: Neon Postgres (pick the Singapore region). Use Drizzle ORM with the `@neondatabase/serverless` driver and versioned migrations. Use a pooled connection string for the app.
+- File storage: Vercel Blob, using a PRIVATE store only (never public). Files are served only through an authenticated route that checks the session and approval status, or through short-lived signed URLs.
+- Scheduled jobs: Vercel Cron, protected by a `CRON_SECRET` header. Design all jobs to run once per day (Hobby plan limits), and make them idempotent.
+- Email: Neither Vercel nor Neon sends email. Use `nodemailer` with Gmail SMTP (a dedicated Gmail account with 2-step verification and an app password) behind a small `sendEmail()` interface, so the provider can be swapped later by changing one file. This is the ONLY allowed external dependency, and it must be documented as such in the Privacy Policy and README.
+- Everything else is built in-app with npm packages: authentication, sessions, rate limiting (counters stored in Neon), search (Postgres full-text search with `tsvector` and `pg_trgm`), image processing (`sharp`), TOTP (`otplib`), password hashing (`@node-rs/argon2`), validation (`zod`), and the bad-word filter.
+- Tests: Vitest for unit tests, Playwright for a few end-to-end tests.
+- Authorisation is enforced on the SERVER in one central data-access layer. Every query and mutation goes through functions that take the current user and check role, ownership and approval status. Never rely on hidden buttons or client-side checks. Add tests that prove a normal member cannot read or modify other people's pending content or reach admin functions.
+- Provide `.env.example` with: DATABASE_URL, BLOB_READ_WRITE_TOKEN (not needed when Vercel's automatic OIDC auth is available), SESSION_SECRET, OTP_PEPPER, ADMIN_EMAIL, ALLOWED_EMAIL_DOMAINS, SMTP_USER, SMTP_APP_PASSWORD, SMTP_FROM, CRON_SECRET, APP_URL, STORAGE_CAP_GB.
+
+## 3. Design system (minimal, flat, NO gradients)
+- No gradients anywhere. No glassmorphism, blur, neon, glow, or decorative shadows. No stock illustrations. No emojis in the UI.
+- Flat solid colours only. Palette: background #FFFFFF, surface #F7F7F8, text #111111, muted text #6B7280, border #E5E7EB, one accent colour #1D4ED8 for primary buttons and links, danger #B91C1C, success #15803D.
+- Separate elements with 1px borders and whitespace, not shadows. Border radius 6px. 8px spacing grid.
+- Font: Inter, self-hosted (no Google Fonts requests), with a system sans-serif fallback. Max 3 text sizes in body content.
+- Icons: Lucide line icons only, used sparingly.
+- Mobile-first and fully responsive (most students will use phones). WCAG 2.1 AA: visible focus rings, colour contrast, keyboard navigation, alt text on images, labelled form fields.
+- Light theme only. Clear empty states, loading skeletons (flat grey, no shimmer gradient), and friendly error messages. Include 404 and 500 pages.
+- Dates shown as "12 Oct 2026", times in 24-hour format, timezone Asia/Kuala_Lumpur.
+
+## 4. Access model
+- The whole site is members-only. Logged-out visitors can see only: the login page, Terms and Conditions, Privacy Policy, Community Guidelines, Copyright and Takedown page, Contact page.
+- Roles: `member` (default), `club_manager` (a flag assigned by admin per club), and `admin`.
+- Admin is exactly ONE account: the email in env var `ADMIN_EMAIL` = mohammedalqadhi745@gmail.com. Enforce this server-side. Nobody can become admin through the UI, an API call, or by editing their profile. Admin cannot be banned, deleted or demoted by anyone.
+- Allowed email domains for members come from env var `ALLOWED_EMAIL_DOMAINS` = imail.sunway.edu.my,sunway.edu.my. Match the exact domain after the "@", case-insensitive. Reject lookalikes such as "imail.sunway.edu.my.evil.com" or "xsunway.edu.my". Normalise emails (trim, lowercase) before any check. The ONLY non-Sunway address that may ever sign in is `ADMIN_EMAIL`.
+
+## 5. Login page (simple) and custom authentication
+One centred card with: the "Sunway Hub" wordmark, one email field, a "Continue" button, and small links to Terms and Privacy. Nothing else.
+
+Flow after the email is submitted:
+1. If the email is `ADMIN_EMAIL`:
+   - First time ever (no password set): send a 6-digit one-time code to that email. After the code is verified, show "Create your password" (min 12 characters, strength meter, reject common passwords). Store only an Argon2id hash. From then on the admin signs in with email + password.
+   - After a password exists: ask for the password. Offer "Forgot password" (one-time code to the admin email). Strongly encourage TOTP two-factor authentication and require re-entering the password before sensitive admin actions.
+   - Admin sessions expire after 12 hours of inactivity.
+2. If the email domain is in `ALLOWED_EMAIL_DOMAINS`: send a 6-digit one-time code (valid 10 minutes, single use, max 5 attempts). No passwords for members. Session lasts 30 days on that device.
+3. Anything else: show "Only Sunway email addresses can sign in." Use the same neutral wording and response timing in all failure cases so the site never reveals which emails exist.
+- Rate limit by IP and by email (e.g. 5 code requests per hour per email), with counters stored in Neon.
+- Only the admin email can ever have a password. There must be no code path that creates or accepts a password for any other account.
+
+Implementation notes:
+- Store one-time codes only as hashes (SHA-256 with `OTP_PEPPER`), with expiry and attempt counters. Invalidate old codes when a new one is issued.
+- Sessions live in a Neon `sessions` table. The cookie holds a random token (stored hashed), is httpOnly, Secure, SameSite=Lax, and rotates on login. Support "sign out everywhere" and admin force-sign-out.
+- Do not use any third-party auth service.
+
+First-login onboarding (members, one-time, cannot skip):
+- Accept Terms and Privacy Policy via an unticked checkbox. Store the document versions and timestamp.
+- Choose a username, display name, role (student / teacher / other) and pronouns (he / she / rather not say). Profile picture and bio are optional.
+
+## 6. Profiles
+Fields: full name, username, bio, email, profile picture, pronouns, role.
+- Username: unique, 3-20 characters, lowercase letters, numbers and underscores only, may be changed once every 30 days, reserved words blocked (admin, support, sunway, moderator, etc.). The bad-word filter applies.
+- Bio: max 160 characters. Bad-word filter applies.
+- Pronouns: exactly three options: "he", "she", "rather not say" (default). Show "he" or "she" on the profile only if chosen; show nothing for "rather not say".
+- Role: student / teacher / other. Choosing "teacher" shows a "Teacher (pending verification)" label only to the owner and admin. The public sees a "Verified teacher" badge only after the admin verifies it. Verification never grants extra permissions; it is a trust badge and does not skip approval.
+- Email: always visible to the owner and admin. Public visibility is a toggle on the profile, DEFAULT HIDDEN.
+- Profile picture: JPG, PNG or WebP, max 2 MB, uploaded through a server route, auto-cropped to a square 512x512 and re-encoded with `sharp` (this strips EXIF metadata). It must be APPROVED BY ADMIN before the public sees it. Until approved, the public sees a flat grey initials avatar, while the owner sees their new picture with a "Pending approval" label. If rejected, the owner is notified with a reason and the old approved picture (or initials) remains. Changing a picture again starts a new approval and keeps the previous approved one visible meanwhile.
+- Profile page shows: picture, name, @username, pronouns, role/badge, bio, email (if public), join date, and a tab listing the user's approved posts. The owner also sees tabs for Pending, Rejected and Bookmarks.
+- Account settings: edit profile, email visibility, notification preferences, download my data (JSON), delete my account (confirm with a code; choose either to delete my posts too, or to keep them anonymised as "Deleted user").
+
+## 7. Posts
+Post types: Study Material, Event, Club Post.
+Fields: title (required, 5-100 characters), description (up to 2000 characters), type, subject tag (course/subject code or name, with autocomplete from existing tags), semester (e.g. "Jan 2026"), optional club, attachments.
+
+Attachments and upload flow (Vercel Blob, private store):
+- Allowed: images (JPG, PNG, WebP, max 10 MB each), PDF (max 25 MB), DOCX/PPTX (max 25 MB), video MP4 (max 50 MB). Up to 10 files per post.
+- Use Vercel Blob CLIENT UPLOADS (the browser uploads directly after the server authorises it), because serverless request bodies are too small for large files. The authorisation step checks the session, the daily quota, the storage cap, allowed content types and the maximum size, and issues a token for a path under `quarantine/{userId}/...`.
+- A finalise step on the server then verifies the real file type by content (magic bytes, not extension), re-encodes images with `sharp` to strip EXIF, computes a SHA-256 hash to detect duplicates, and only then records the file against the post. Files that fail are deleted from Blob immediately. Orphaned quarantine files are deleted by the daily cron job.
+- Files are never reachable by a public URL. Serve them through an authenticated route (or a short-lived signed URL) that confirms: the viewer is logged in, and the post is approved (or the viewer is the owner or admin).
+- Upload quotas: 10 uploads per day and 200 MB total per user, configurable by admin. The Hobby Blob allowance is shared and shared storage can stop working if the limit is exceeded, so add a global storage guard: env `STORAGE_CAP_GB`, an admin storage meter, a warning at 80%, and automatic refusal of new uploads at 90%.
+- Malware scanning is not available in this stack. Instead, restrict file types strictly, never execute or render uploaded HTML, and serve downloads with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+
+Rules:
+- Before submitting, the uploader must tick: "This is my own work, or I have permission to share it. It is not a lecturer's slides, a textbook, an exam paper, exam answers, or assessment material for a currently running assessment."
+- APPROVAL REQUIRED FOR EVERY UPLOAD. Status flow: pending -> approved | rejected | changes_requested. Only approved posts are visible to other members. The poster sees their own pending, rejected and changes-requested posts with the admin's reason. Admin posts are auto-approved.
+- Poster permissions: may EDIT THE TITLE ONLY. Description, tags, semester and attachments (images, videos, files) are locked after submission; to change them, delete and repost. Title edits must pass the bad-word filter, show an "edited" label, store the previous title in an edit history visible to admin, and be revertible by admin. Add an admin setting "Require re-approval after title edit" (default off).
+- Delete: the poster can delete their own post, and the admin can delete any post (admin must enter a reason, which is sent to the poster). Deletion is soft first (hidden immediately), with permanent purge of the database rows and Blob files after 30 days by the daily cron job. Log every deletion in the audit log.
+- Member actions on approved posts: "Helpful" vote (one per user, removable), bookmark, report, share link (works only for logged-in members).
+- Report button on every post, profile, club, event: reason categories (copyright, inappropriate, harassment, exam/cheating material, spam, other) + optional note. Content with 3+ open reports from different users is auto-hidden pending admin review.
+- Browsing: Home feed (newest approved), Subjects pages (organised by subject tag and semester), full-text search (Postgres) with filters (type, subject, semester, verified teacher, club), sort by newest / most helpful, pagination. Keep large text and metadata in Neon and files in Blob, to stay within the Neon storage allowance.
+
+## 8. Clubs and events
+- Clubs directory: card grid with search and category filter. Categories: Accounting & Finance, Art & Music, Business, Cultural, General Interest, Martial Art, Nature, Religious, Sports, Uniform/Affiliate, Academic/Professional, Student Leadership Body.
+- Club page: name, category, description, logo (admin-approved), social links (Instagram etc.), Follow button, upcoming events, recent club posts, list of club managers.
+- Club managers: students can request to manage a club (message + proof). Admin approves and assigns the `club_manager` flag for that club. Club managers can edit their club's description and social links (edits go through the bad-word filter) and post events/club posts, which STILL require admin approval.
+- Events: title, date and time, location, description, poster image, club (optional), RSVP (Going / Interested) with optional capacity, calendar view + list view, "Add to calendar" (.ics download). Events require admin approval like all uploads.
+- Notifications (in-app and optional email, per-user settings): new approved posts in followed subjects or clubs (sent as one daily digest, to respect the Gmail sending limit), decision on my post/picture/club request, and a daily reminder for events happening in the next 24-36 hours that I RSVPed to.
+
+### Admin button: "Import Sunway clubs"
+In Admin > Clubs add a button "Import Sunway clubs" that loads the seed list below into the database (upsert by slug, so clicking twice never duplicates), published immediately. Also add an "Add club" form, and a "Bulk import CSV" (columns: name, category, instagram, description). Mark seeded clubs "Unclaimed" until a club manager is approved. Names and handles come from Sunway's public Student LIFE and University pages; the admin will verify and complete the rest (Sunway lists 100+ clubs, and only part is seeded here).
+
+Student Leadership Bodies (category "Student Leadership Body"):
+- Sunway University Student Council (SUSC) | instagram: sus_council
+- Sunway College Student Council | instagram: sccsunway
+- Sunway Sports Council | instagram: sunway.sportscouncil
+- Echo Media | instagram: sunwayechomedia
+- Sunway Student Volunteers (SSV) | instagram: ssv_shoeboxproject
+- Sunway Student Ambassadors (SSA) | instagram: sunwayssa
+- Sunway International Student Ambassadors (SISA) | instagram: sisa_sunway
+- Sunway Global Friends Community (SGFC) | instagram: sunwayglobalfriendscommunity
+- Peer Support Volunteer (PCV) | instagram: sunway_pcv
+
+Clubs and societies (assign the closest category; admin can change):
+- Wushu Club | sunwayuni.wushuclub (Martial Art)
+- Sunway DealFlow Club | sdfc.sunway (Business)
+- Bouldering Club | sunwayboulderingclub (Sports)
+- Sunway Oceans Society | sos_sunwayoceansociety (Nature)
+- Institute of Civil Engineering Student Chapter | icesunway (Academic/Professional)
+- Sunway Myanmar Society | sunway_myanmar_society (Cultural)
+- Sunway Arabic & Middle Eastern Society | samess_sunway (Cultural)
+- Sunway Eco Club | sunway.eco (Nature)
+- Sunway Sudanese Society | sss_sunway (Cultural)
+- Sunway Bangladeshi Society | sunwaybd (Cultural)
+- Sunway Japanese Student Association | jsas_sunway (Cultural)
+- Sunway University Mauritian Society | sums.sunway (Cultural)
+- Sunway Seychelles Society | sunwayseychelles (Cultural)
+- Sunway African Cultural Association (SACA) | sunwaysaca (Cultural)
+- Sunway Pakistani Community | sunway_pc (Cultural)
+- Sunway Sri Lankan Society | sunway_sri_lankan_society (Cultural)
+- Sunway Maldivian Association | sunway_sma (Cultural)
+- Rubik's Cube Club | sunway_rubikscube (General Interest)
+- Sunway Pawprint Society | sunwaypawprint (Nature)
+- Sunway Photography Club | sunwayphotographyclub (Art & Music)
+- Sunway Film Society | sunwayfilmsociety (Art & Music)
+- Sunway Game Development Club | sunwaygamedev (General Interest)
+- IChemE Sunway Student Chapter | ichemeumsc (Academic/Professional)
+- IEM Sunway Student Section | iemsunway (Academic/Professional)
+- Rotaract Club of Sunway University (Uniform/Affiliate)
+- TEDxSunway University (Uniform/Affiliate)
+- Sunway LEO Club (Uniform/Affiliate)
+- Amnesty Malaysia Sunway Club (Uniform/Affiliate)
+- Sunway University Toastmasters Club (Uniform/Affiliate)
+- Sunway Model United Nations (SUNMUN) (Uniform/Affiliate)
+- Sunway Biological Society (SBIOS) (Nature)
+- Sunway Sustainability Club (SSC) (Nature)
+- Sunway Education Wildlife Club (SWC) (Nature)
+- Sunway Christian Fellowship (Religious) [name taken from an event listing; admin to verify]
+- Sunway University Chinese Orchestra (Art & Music) [name taken from an event listing; admin to verify]
+- Team Sunway (Sports) [inter-varsity representation platform]
+
+## 9. Bad-word filtering (applies EVERYWHERE)
+Block profanity in every text input: names, usernames, bios, post titles and descriptions, title edits, club and event text, report notes, contact form, club manager requests, any future comment or Q&A text, and uploaded file names.
+- Run the check on the server (authoritative) and in the browser (for instant feedback). A client-side check alone is never enough.
+- Use a maintained library (for example `obscenity` for JavaScript) and add: English profanity, common Malay profanity, and common transliterated Arabic, Chinese and Tamil insults used in Malaysia. Normalise text before checking: Unicode normalisation, lowercase, strip accents, collapse repeated characters, convert leetspeak (@ -> a, 0 -> o, $ -> s, 1 -> i), and ignore inserted spaces, dots and symbols. Use word-boundary logic to avoid false positives on innocent words (the "Scunthorpe problem"), e.g. "class", "assess", "Essex".
+- On a hit, block the submission and show: "Please remove inappropriate language and try again." Do not say which word triggered it.
+- Admin page "Blocked words": view, add, remove and import words, and an allow-list for false positives. Changes apply instantly (stored in Neon, cached briefly in memory).
+- Unit-test the filter with at least 50 cases (obfuscated spellings, innocent words, other languages).
+- Images and videos cannot be word-filtered, so they depend on admin approval and on reports. Add an optional adapter for an image-moderation API, disabled by default.
+
+## 10. Admin panel (admin has access to EVERYTHING)
+Admin is reached at /admin and is hidden from everyone else (return 404 to non-admins). Sections:
+1. Dashboard: counts of pending posts, pending profile pictures, open reports, pending teacher verifications, pending club-manager requests, new users this week, Blob storage used vs `STORAGE_CAP_GB`, database size.
+2. Approval queue: pending posts, events, profile pictures, club logos, with a full preview of the files. Actions: approve, reject (with reason), request changes (with note). Bulk approve/reject. Keyboard shortcuts. Decisions send an in-app notification, and an email notification (batched, to respect sending limits).
+3. Content: search, view, delete any post, event, club, comment or file; revert title edits; restore soft-deleted items within 30 days.
+4. Users: search and view every user including email and all their content; change role label; verify or unverify teacher badge; assign club manager; suspend (temporary) or ban; force sign-out; delete account. Cannot act on the admin account. No impersonation feature.
+5. Clubs: add, edit, delete clubs; "Import Sunway clubs" button; CSV import; review club-manager requests.
+6. Reports: queue with the reported item, reporter notes, and actions (dismiss, remove content, warn user, ban user).
+7. Blocked words: described in section 9.
+8. Site settings: upload limits and quotas, allowed file types, allowed email domains (read from env but shown), toggle "require re-approval after title edit", site-wide announcement banner, maintenance mode.
+9. Legal: edit and publish new versions of Terms and Privacy (the system records which version each user accepted and asks users to re-accept after a new version).
+10. Audit log: every admin action and every deletion with timestamp, actor and reason. Not editable. Exportable as CSV.
+11. Data tools: export all data (JSON/CSV, including a one-click full backup export), and storage clean-up.
+
+## 11. Legal and policy pages (generate full drafts, in plain English)
+Create these pages, linked in the footer and in onboarding. Put a top-of-file code comment in each template: "DRAFT - have this reviewed by Sunway Student LIFE or a qualified lawyer before launch." Leave clearly marked placeholders such as [CONTACT EMAIL] where the owner must fill in details.
+
+Privacy Policy must cover (Malaysia's Personal Data Protection Act 2010 as amended in 2024):
+- Who runs the site (an individual student, unofficial, non-commercial) and a contact email for privacy requests.
+- What we collect: Sunway email, name, username, bio, pronouns, role, profile picture, uploaded content, RSVPs, bookmarks, helpful votes, reports, technical logs (IP, device, timestamps) for security. State that we do NOT collect student IDs, grades, phone numbers, or payment data.
+- Why (run the community, moderation, security) and the legal basis (consent given at sign-up).
+- Who sees what (members-only site; email hidden by default; admin sees everything).
+- Retention (soft-delete then purge after 30 days; logs 90 days; deleted accounts erased promptly).
+- Service providers and cross-border storage: name Vercel (hosting and file storage), Neon (database) and Google (Gmail, used only to send login and notification emails). State that data may be stored outside Malaysia and that signing up is consent to this.
+- User rights: access, correction, deletion, withdraw consent, download my data, and how to request them. Breach notification commitment.
+- Cookies: essential only (session). No advertising or analytics cookies, so no cookie banner is needed. Say so.
+- Children and minors; changes to the policy; contact.
+
+Terms and Conditions must cover:
+- Eligibility (current Sunway students, teachers and staff with a valid Sunway email); accounts and security; one account per person.
+- Unofficial status and no affiliation with Sunway University; non-commercial, free service; no guarantee of availability or accuracy; "as is" with limited liability; Malaysian governing law.
+- User content: you keep ownership; you give the site a non-exclusive licence to host and display it to members; you promise you own it or have permission.
+- Prohibited content: lecturers' slides without permission, textbooks, exam papers or answers, assessment solutions, plagiarised or contract-cheating material, harassment, hate, sexual content, personal data of others, profanity, advertising or selling, anything illegal.
+- Moderation: all uploads require admin approval; admin may reject, remove or suspend without notice; appeals by email.
+- Academic integrity warning: users remain responsible for complying with Sunway's own rules.
+- Termination, changes to the terms, contact.
+
+Also create: Community Guidelines (short, friendly list of dos and don'ts), Copyright and Takedown page (a form and email for rights holders and lecturers to request removal; the admin target is to remove reported content within 48 hours and to hide it immediately while reviewing), and a Contact/Feedback page (rate limited, bad-word filtered).
+
+## 12. Security and quality requirements
+- Central server-side authorisation layer (see section 2). Every API route and server action re-checks the session and role.
+- Zod validation on all inputs; output encoding to prevent XSS; CSRF protection for all mutations; strict Content-Security-Policy and other security headers; no third-party scripts, fonts or trackers.
+- Rate limiting (counters in Neon) on login, uploads, reports, search and contact.
+- Private Blob storage only; never expose raw storage paths.
+- Do not log email addresses, one-time codes or file contents in application logs.
+- Backups: rely on Neon's built-in restore features, and also provide the admin "full export" in section 10. Document the restore procedure in the README.
+- Unit tests: email-domain matching (including lookalikes), admin-only rules, profanity filter, upload validation, post permissions (poster can edit the title only), and authorisation tests proving members cannot access other users' pending content or admin functions. E2E tests: login (member and admin first-time), post upload -> approval -> visible, profile picture approval, delete by poster and by admin.
+- Accessibility check with axe on the main pages.
+
+## 13. Data model (suggested tables)
+users, admin_credentials, otp_codes, sessions, rate_limits, user_consents, posts, post_files, post_title_history, subjects, post_subjects, helpful_votes, bookmarks, reports, clubs, club_follows, club_managers, club_manager_requests, events, event_rsvps, notifications, notification_settings, blocked_words, allowed_words, site_settings, legal_documents, audit_log, upload_quotas.
+
+## 14. Phase 2 (build after Phase 1 is working and tested)
+- Q&A per subject (questions and answers, same bad-word filter, same report system, and an admin setting for whether approval is required; default: required).
+- Contributor leaderboard (opt-in, simple list, based on helpful votes).
+- Study group finder (post a request for a study group by subject; same approval and filter rules).
+- Do NOT build a textbook marketplace or anything that involves money.
+
+## 15. Build order
+1. Project setup on Vercel + Neon, design system, Drizzle schema and migrations.
+2. Auth: login flow (member OTP, admin first-time password, TOTP), sessions, onboarding, consent records, rate limiting.
+3. Profiles and profile picture approval.
+4. Bad-word filter (server + client) and its tests.
+5. Posts: Blob client-upload flow, approval, title-only editing, deletion, helpful, bookmarks, reports, search.
+6. Clubs, events, RSVP, notifications, daily cron jobs, "Import Sunway clubs" button.
+7. Admin panel and audit log.
+8. Legal pages and policy versioning.
+9. Tests, accessibility, security review, README.
+
+## 16. Deliverables
+- Working code in a Git repository with a README covering: creating the Neon project and the Vercel project, creating the private Blob store, setting every environment variable, setting up the Gmail app password, running migrations, deploying, configuring Vercel Cron, and restoring from backup. Include a HANDOVER.md explaining how to transfer admin ownership when the owner graduates (Vercel project, Neon project, Gmail account, domain, and who the next admin should be).
+- A seed script (including the clubs above), and a short checklist of manual steps the owner must do before launch.
+- A final "Assumptions and open questions" list.
