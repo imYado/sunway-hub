@@ -1,0 +1,73 @@
+import "server-only";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db";
+import { contactMessages, posts, users } from "@/db/schema";
+import { env } from "@/lib/env";
+import { isValidEmailShape, normaliseEmail } from "@/lib/email-domain";
+import type { Actor } from "../actor-types";
+import { audit } from "../audit";
+import { AppError } from "../errors";
+import { assertClean } from "../profanity";
+import { enforce, LIMITS } from "../rate-limit";
+import { notify } from "./notifications";
+
+export const contactSchema = z.object({
+  kind: z.enum(["contact", "takedown"]),
+  name: z.string().trim().min(2, "Enter your name.").max(100),
+  email: z.string().trim().max(254),
+  subject: z.string().trim().max(150).optional().default(""),
+  message: z.string().trim().min(10, "Please write a little more.").max(3000),
+  contentUrl: z.string().trim().max(500).optional().default(""),
+});
+
+/** Finds a post id in a link to this site, e.g. https://site/posts/<uuid>. */
+export function postIdFromUrl(url: string): string | null {
+  const m = /\/posts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(url);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/**
+ * Contact and takedown requests (also available to logged-out visitors).
+ * A takedown that names a post on this site hides it immediately while the admin reviews.
+ */
+export async function submitContact(actor: Actor | null, raw: z.input<typeof contactSchema>, ipKey: string): Promise<{ hidden: boolean }> {
+  const input = contactSchema.parse(raw);
+  await enforce("contact", ipKey, LIMITS.contactPerIp.limit, LIMITS.contactPerIp.window);
+  const email = normaliseEmail(input.email);
+  if (!isValidEmailShape(email)) throw new AppError("Enter a valid email address so we can reply.");
+  await assertClean(input.name, input.subject, input.message);
+  let hiddenPostId: string | null = null;
+  if (input.kind === "takedown") {
+    if (!input.contentUrl) throw new AppError("Add the link to the content you want removed.");
+    const id = postIdFromUrl(input.contentUrl);
+    if (id) {
+      const [p] = await db.select({ id: posts.id }).from(posts).where(eq(posts.id, id)).limit(1);
+      if (p) {
+        await db.update(posts).set({ hiddenByReports: true }).where(eq(posts.id, id));
+        hiddenPostId = id;
+        await audit(null, "post.hidden_by_takedown", { type: "post", id });
+      }
+    }
+  }
+  await db.insert(contactMessages).values({
+    kind: input.kind,
+    userId: actor?.id ?? null,
+    name: input.name,
+    email,
+    subject: input.subject || null,
+    message: input.message,
+    contentUrl: input.contentUrl || null,
+    hiddenPostId,
+  });
+  // Let the admin know in-app (and in their daily email digest).
+  const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.email, env.adminEmail)).limit(1);
+  if (admin) {
+    await notify([admin.id], {
+      kind: "system",
+      title: input.kind === "takedown" ? "New takedown request (48 h target)" : "New contact message",
+      link: "/admin/messages",
+    });
+  }
+  return { hidden: !!hiddenPostId };
+}
