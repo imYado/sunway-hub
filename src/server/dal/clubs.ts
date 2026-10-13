@@ -286,23 +286,18 @@ async function uniqueSlug(name: string): Promise<string> {
 /** Upsert by slug, so clicking twice never duplicates. Published immediately. */
 export async function importSunwayClubs(actor: Actor): Promise<{ inserted: number; updated: number }> {
   assertAdmin(actor);
-  let inserted = 0;
-  let updated = 0;
-  for (const c of SUNWAY_CLUBS) {
-    const slug = slugify(c.name);
-    const socials: Record<string, string> = c.instagram ? { instagram: c.instagram } : {};
-    const [existing] = await db.select({ id: clubs.id, deletedAt: clubs.deletedAt }).from(clubs).where(eq(clubs.slug, slug)).limit(1);
-    if (existing) {
-      // Do not overwrite edits made since the last import; only restore missing basics.
-      updated++;
-      continue;
-    }
-    await db
-      .insert(clubs)
-      .values({ slug, name: c.name, category: c.category, socials, description: c.note ?? "", seeded: true })
-      .onConflictDoNothing({ target: clubs.slug });
-    inserted++;
-  }
+  // Existing clubs (matched by slug) are never overwritten, so edits made since the last import survive.
+  const rows = SUNWAY_CLUBS.map((c) => ({
+    slug: slugify(c.name),
+    name: c.name,
+    category: c.category,
+    socials: (c.instagram ? { instagram: c.instagram } : {}) as Record<string, string>,
+    description: c.note ?? "",
+    seeded: true,
+  }));
+  const created = await db.insert(clubs).values(rows).onConflictDoNothing({ target: clubs.slug }).returning({ id: clubs.id });
+  const inserted = created.length;
+  const updated = rows.length - inserted;
   await audit(actor, "clubs.import_sunway", {}, null, { inserted, skipped: updated });
   return { inserted, updated };
 }
@@ -310,7 +305,7 @@ export async function importSunwayClubs(actor: Actor): Promise<{ inserted: numbe
 export const adminClubSchema = z.object({
   name: z.string().trim().min(2).max(120),
   category: z.enum(CLUB_CATEGORIES),
-  description: z.string().trim().max(2000).default(""),
+  description: z.string().trim().max(2000).optional(),
   instagram: z.string().trim().max(100).optional().default(""),
 });
 
@@ -322,7 +317,7 @@ export async function adminAddClub(actor: Actor, raw: z.input<typeof adminClubSc
   const socials = input.instagram ? cleanSocials({ instagram: input.instagram }) : {};
   const [row] = await db
     .insert(clubs)
-    .values({ slug, name: input.name, category: input.category, description: input.description, socials })
+    .values({ slug, name: input.name, category: input.category, description: input.description ?? "", socials })
     .returning({ id: clubs.id });
   await audit(actor, "club.create", { type: "club", id: row.id }, null, { name: input.name });
   return slug;
@@ -338,7 +333,13 @@ export async function adminEditClub(actor: Actor, clubId: string, raw: z.input<t
   if (!input.instagram) delete socials.instagram;
   await db
     .update(clubs)
-    .set({ name: input.name, category: input.category, description: input.description, socials, updatedAt: new Date() })
+    .set({
+      name: input.name,
+      category: input.category,
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      socials,
+      updatedAt: new Date(),
+    })
     .where(eq(clubs.id, clubId));
   await audit(actor, "club.edit", { type: "club", id: clubId });
 }

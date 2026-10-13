@@ -19,6 +19,7 @@ import {
 } from "@/lib/files";
 import type { Actor } from "../actor-types";
 import { AppError, ForbiddenError } from "../errors";
+import { assertImageAllowed } from "../moderation";
 import { assertClean } from "../profanity";
 import { enforce, LIMITS } from "../rate-limit";
 import { getSettings } from "../settings";
@@ -141,6 +142,7 @@ export async function processFileBytes(input: Buffer, originalName: string, enab
       throw new AppError(`"${originalName}" could not be read as an image.`);
     }
     mime = sniffed.mime;
+    await assertImageAllowed(data, mime, originalName);
     ext = sniffed.mime === "image/png" ? "png" : sniffed.mime === "image/webp" ? "webp" : "jpg";
   }
   return { data, kind: sniffed.kind, mime, ext, sha256: sha256Hex(data), width, height };
@@ -151,16 +153,18 @@ export async function processSquareImage(input: Buffer): Promise<ProcessedFile> 
   if (input.length > AVATAR_MAX_BYTES) throw new AppError("Images can be up to 2 MB.");
   const sniffed = sniffFileType(input);
   if (!sniffed || sniffed.kind !== "image") throw new AppError("Please upload a JPG, PNG or WebP image.");
+  let data: Buffer;
   try {
-    const data = await sharp(input, { limitInputPixels: 50_000_000 })
+    data = await sharp(input, { limitInputPixels: 50_000_000 })
       .rotate()
       .resize(512, 512, { fit: "cover", position: "attention" })
       .webp({ quality: 85 })
       .toBuffer();
-    return { data, kind: "image", mime: "image/webp", ext: "webp", sha256: sha256Hex(data), width: 512, height: 512 };
   } catch {
     throw new AppError("That image could not be read. Please try another one.");
   }
+  await assertImageAllowed(data, "image/webp", "This image");
+  return { data, kind: "image", mime: "image/webp", ext: "webp", sha256: sha256Hex(data), width: 512, height: 512 };
 }
 
 export interface FinalisedFile {

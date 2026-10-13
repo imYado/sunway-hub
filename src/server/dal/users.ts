@@ -275,6 +275,7 @@ export async function exportMyData(actor: Actor) {
     exportedAt: new Date().toISOString(),
     profile: me,
     consents: await db.select().from(userConsents).where(eq(userConsents.userId, actor.id)),
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- drop the internal search column
     posts: myPosts.map(({ search: _s, ...p }) => p),
     files: postIds.length
       ? (await db.select().from(storedFiles).where(inArray(storedFiles.postId, postIds))).map((f) => ({

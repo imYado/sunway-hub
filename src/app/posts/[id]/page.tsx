@@ -1,0 +1,244 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Bookmark, CalendarPlus, Download, ThumbsUp } from "lucide-react";
+import { ActionForm, SubmitButton } from "@/components/ui/action-form";
+import { CleanInput, CleanTextarea } from "@/components/ui/clean-input";
+import { CopyLinkButton } from "@/components/ui/copy-link";
+import { AuthorName, StatusBadge } from "@/components/posts/post-card";
+import { ReportForm } from "@/components/report-form";
+import { formatDate, formatDateTime } from "@/lib/dates";
+import { formatBytes } from "@/lib/files";
+import { TITLE_MAX } from "@/lib/rules";
+import { bookmarkAction, deletePostAction, editTitleAction, helpfulAction, rsvpAction } from "@/app/actions/posts";
+import { revertTitleAction } from "@/app/actions/admin";
+import { requireMember } from "@/server/actor";
+import { NotFoundError } from "@/server/errors";
+import { getPostDetail, type PostDetail } from "@/server/dal/posts";
+
+export const metadata: Metadata = { title: "Post" };
+
+async function load(id: string): Promise<PostDetail> {
+  const actor = await requireMember();
+  try {
+    return await getPostDetail(actor, id);
+  } catch (err) {
+    if (err instanceof NotFoundError) notFound();
+    throw err;
+  }
+}
+
+const TYPE_LABEL = { study: "Study Material", event: "Event", club: "Club Post" } as const;
+
+export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = await load(id);
+  const v = post.viewer;
+  const images = post.files.filter((f) => f.kind === "image");
+  const others = post.files.filter((f) => f.kind !== "image");
+
+  return (
+    <article className="mx-auto max-w-3xl">
+      {post.deletedAt && (
+        <p className="surface mb-4 p-3 text-sm text-danger">This post was deleted on {formatDate(post.deletedAt)} and will be purged after 30 days.</p>
+      )}
+      {(v.isOwner || v.isAdmin) && post.status !== "approved" && (
+        <div className="surface mb-4 p-3 text-sm">
+          <StatusBadge status={post.status} />
+          <p className="mt-2">
+            {post.status === "pending" && "Only you and the admin can see this post until it is approved."}
+            {post.status === "rejected" && "This post was not approved."}
+            {post.status === "changes_requested" && "The admin asked for changes. Only the title can be edited; to change anything else, delete this post and submit it again."}
+          </p>
+          {post.decisionReason && <p className="mt-2">Admin note: {post.decisionReason}</p>}
+        </div>
+      )}
+      {post.hiddenByReports && (v.isOwner || v.isAdmin) && (
+        <p className="surface mb-4 p-3 text-sm text-danger">This post is hidden while the admin reviews reports about it.</p>
+      )}
+
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+        <span className="badge">{TYPE_LABEL[post.type]}</span>
+        {post.club && <Link href={`/clubs/${post.club.slug}`}>{post.club.name}</Link>}
+      </div>
+      <h1 className="text-xl font-semibold">
+        {post.title}
+        {post.titleEdited && <span className="ml-2 text-sm font-normal text-muted">(edited)</span>}
+      </h1>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+        <AuthorName author={post.author} />
+        <span>{formatDate(post.createdAt)}</span>
+        {post.subjects.map((s) => (
+          <Link key={s.slug} href={`/subjects/${s.slug}`}>
+            {s.name}
+          </Link>
+        ))}
+        {post.semester && <span>{post.semester}</span>}
+      </div>
+
+      {post.event && (
+        <section aria-label="Event details" className="surface mt-4 p-4">
+          <p className="font-medium">
+            {formatDateTime(post.event.startsAt)}
+            {post.event.endsAt && ` to ${formatDateTime(post.event.endsAt)}`}
+          </p>
+          <p className="text-sm">{post.event.location}</p>
+          <p className="mt-1 text-sm text-muted">
+            {post.event.going} going{post.event.capacity ? ` of ${post.event.capacity}` : ""} · {post.event.interested} interested
+          </p>
+          {v.canInteract && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(["going", "interested"] as const).map((s) => (
+                <ActionForm key={s} action={rsvpAction}>
+                  <input type="hidden" name="postId" value={post.id} />
+                  <input type="hidden" name="status" value={v.rsvp === s ? "none" : s} />
+                  <SubmitButton variant={v.rsvp === s ? "primary" : "default"} size="sm">
+                    {s === "going" ? "Going" : "Interested"}
+                    {v.rsvp === s && <span className="sr-only"> (selected, select to remove)</span>}
+                  </SubmitButton>
+                </ActionForm>
+              ))}
+              <a href={`/api/events/${post.id}/ics`} className="btn btn-sm">
+                <CalendarPlus size={14} aria-hidden="true" /> Add to calendar
+              </a>
+            </div>
+          )}
+        </section>
+      )}
+
+      {post.description && <p className="mt-4 whitespace-pre-wrap break-words">{post.description}</p>}
+
+      {images.length > 0 && (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {images.map((f) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={f.id}
+              src={`/api/files/${f.id}`}
+              alt={`Image attached to "${post.title}": ${f.name}`}
+              width={f.width ?? undefined}
+              height={f.height ?? undefined}
+              loading="lazy"
+              className="h-auto w-full rounded border border-line"
+            />
+          ))}
+        </div>
+      )}
+      {others.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {others.map((f) =>
+            f.kind === "video" ? (
+              <li key={f.id}>
+                <video controls preload="metadata" className="w-full rounded border border-line" aria-label={`Video: ${f.name}`}>
+                  <source src={`/api/files/${f.id}`} type="video/mp4" />
+                </video>
+                <a href={`/api/files/${f.id}?download=1`} className="mt-1 inline-flex items-center gap-1 text-sm">
+                  <Download size={14} aria-hidden="true" /> Download {f.name}
+                </a>
+              </li>
+            ) : (
+              <li key={f.id} className="card flex flex-wrap items-center justify-between gap-2 p-3">
+                <span className="break-all text-sm">
+                  {f.name} <span className="text-muted">({formatBytes(f.size)})</span>
+                </span>
+                <a href={`/api/files/${f.id}?download=1`} className="btn btn-sm">
+                  <Download size={14} aria-hidden="true" /> Download
+                </a>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+
+      {v.canInteract && (
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+          {!v.isOwner && (
+            <ActionForm action={helpfulAction}>
+              <input type="hidden" name="postId" value={post.id} />
+              <SubmitButton variant={v.helpful ? "primary" : "default"} size="sm">
+                <ThumbsUp size={14} aria-hidden="true" /> Helpful ({post.helpfulCount})
+                {v.helpful && <span className="sr-only"> (you marked this helpful, select to remove)</span>}
+              </SubmitButton>
+            </ActionForm>
+          )}
+          {v.isOwner && <span className="text-sm text-muted">{post.helpfulCount} found this helpful</span>}
+          <ActionForm action={bookmarkAction}>
+            <input type="hidden" name="postId" value={post.id} />
+            <SubmitButton variant={v.bookmarked ? "primary" : "default"} size="sm">
+              <Bookmark size={14} aria-hidden="true" /> {v.bookmarked ? "Bookmarked" : "Bookmark"}
+            </SubmitButton>
+          </ActionForm>
+          <CopyLinkButton path={`/posts/${post.id}`} />
+        </div>
+      )}
+      {!v.isOwner && !post.deletedAt && <ReportForm targetType="post" targetId={post.id} />}
+
+      {v.canEditTitle && (
+        <section className="mt-8 border-t border-line pt-4">
+          <h2 className="text-lg font-semibold">Manage your post</h2>
+          <p className="mt-1 text-sm text-muted">
+            You can edit the title only. Description, tags, semester and files are locked after submission. To change them, delete this post and
+            submit it again.
+          </p>
+          <ActionForm action={editTitleAction} className="mt-3">
+            <input type="hidden" name="postId" value={post.id} />
+            <label htmlFor="edit-title" className="label">
+              Title
+            </label>
+            <CleanInput id="edit-title" name="title" defaultValue={post.title} minLength={5} maxLength={TITLE_MAX} required />
+            <div className="mt-2">
+              <SubmitButton variant="default" size="sm">
+                Save title
+              </SubmitButton>
+            </div>
+          </ActionForm>
+        </section>
+      )}
+
+      {v.canDelete && (
+        <section className="mt-6">
+          <ActionForm action={deletePostAction} confirm="Delete this post? It will be hidden immediately and erased after 30 days.">
+            <input type="hidden" name="postId" value={post.id} />
+            <input type="hidden" name="redirectTo" value={v.isAdmin && !v.isOwner ? "/admin/content" : "/"} />
+            {v.isAdmin && !v.isOwner && (
+              <div className="mb-2">
+                <label htmlFor="delete-reason" className="label">
+                  Reason (sent to the poster)
+                </label>
+                <CleanTextarea id="delete-reason" name="reason" required maxLength={500} rows={2} />
+              </div>
+            )}
+            <SubmitButton variant="danger" size="sm">
+              Delete post
+            </SubmitButton>
+          </ActionForm>
+        </section>
+      )}
+
+      {v.isAdmin && post.titleHistory.length > 0 && (
+        <section className="mt-8 border-t border-line pt-4">
+          <h2 className="text-lg font-semibold">Title history (admin only)</h2>
+          <ul className="mt-2 space-y-2 text-sm">
+            {post.titleHistory.map((h) => (
+              <li key={h.id} className="card flex flex-wrap items-center justify-between gap-2 p-3">
+                <span>
+                  {formatDateTime(h.editedAt)}: &quot;{h.oldTitle}&quot; to &quot;{h.newTitle}&quot;
+                  {h.revertedAt && <span className="text-muted"> (reverted)</span>}
+                </span>
+                {!h.revertedAt && (
+                  <ActionForm action={revertTitleAction}>
+                    <input type="hidden" name="historyId" value={h.id} />
+                    <input type="hidden" name="postId" value={post.id} />
+                    <SubmitButton variant="default" size="sm">
+                      Revert
+                    </SubmitButton>
+                  </ActionForm>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </article>
+  );
+}

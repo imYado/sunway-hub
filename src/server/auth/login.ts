@@ -211,3 +211,14 @@ export async function enableTotp(userId: string, secret: string, code: string): 
 export async function disableTotp(userId: string) {
   await db.update(adminCredentials).set({ totpSecretEnc: null, totpEnabled: false, updatedAt: new Date() }).where(eq(adminCredentials.userId, userId));
 }
+
+export async function changeAdminPassword(userId: string, email: string, current: string, next: string, ipKey: string) {
+  if (!(await confirmAdminPassword(userId, email, current, ipKey))) throw new AppError("Your current password is incorrect.");
+  if (!isAcceptablePassword(next, [email])) throw new AppError("Choose a stronger password: at least 12 characters, not a common password.");
+  await db.update(adminCredentials).set({ passwordHash: await hashPassword(next), updatedAt: new Date() }).where(eq(adminCredentials.userId, userId));
+}
+
+export async function getAdminSecurity(userId: string) {
+  const [creds] = await db.select({ totpEnabled: adminCredentials.totpEnabled, updatedAt: adminCredentials.updatedAt }).from(adminCredentials).where(eq(adminCredentials.userId, userId)).limit(1);
+  return creds ?? null;
+}
