@@ -116,21 +116,23 @@ Changing `SESSION_SECRET` signs everyone out and breaks the stored TOTP secret. 
 
 ### 6. Migrations and seed
 
-Run from your machine against production (put the production values in a temporary `.env.production.local`, or export them in your shell):
+This happens automatically. On every Vercel deploy, the `vercel-build` script in `package.json` runs the migrations and then the seed (`tsx scripts/seed.ts --deploy`) before building. Once the database variables are set, redeploy and the tables are created.
+
+The deploy seed is safe to run every time. It adds:
+- version 1 of the Terms and Privacy Policy
+- the 45 built-in Sunway clubs, only while the clubs table is empty, so clubs the admin deletes don't come back
+- default site settings
+
+If `DATABASE_URL` isn't set, both steps are skipped and the build carries on. Preview deploys migrate whatever database their variables point at, so point Preview at a separate Neon branch.
+
+To run the same steps by hand (for example against a fresh Neon branch), export `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, then run:
 
 ```bash
 npm run db:migrate
 npm run db:seed
 ```
 
-The seed is safe to run repeatedly. It adds:
-- version 1 of the Terms and Privacy Policy
-- the 45 built-in Sunway clubs
-- default site settings
-
-Run `db:migrate` again before or right after every deploy that adds a file to `drizzle/`.
-
-To change the schema: edit `src/db/schema.ts`, run `npm run db:generate`, review the new SQL in `drizzle/`, then commit it.
+To change the schema: edit `src/db/schema.ts`, run `npm run db:generate`, review the new SQL in `drizzle/`, then commit it. The next deploy applies it.
 
 ### 7. Deploy and cron
 
@@ -173,7 +175,7 @@ To restore from a full export instead of Neon, for example when moving to a new 
 - [ ] Create the Vercel project and the **private** Blob store, and connect them.
 - [ ] Create the dedicated Gmail account, turn on 2-step verification and make an app password.
 - [ ] Set every environment variable for Production, using fresh random secrets.
-- [ ] Run `npm run db:migrate` and `npm run db:seed` against production.
+- [ ] Redeploy after setting the variables, so the deploy creates the tables and adds the clubs.
 - [ ] Deploy, then confirm the cron job appears under **Vercel > Settings > Cron Jobs**.
 - [ ] Sign in as admin, set the password, finish onboarding and **turn on TOTP**.
 - [ ] Fill in `[CONTACT EMAIL]`, `[OWNER NAME]` and `[EFFECTIVE DATE]` in `src/content/legal/terms.ts` and `privacy.ts`, or edit them in **Admin > Legal**. Have the drafts reviewed; they are not legal advice.
