@@ -1,4 +1,5 @@
 // Applies versioned SQL migrations from ./drizzle. Run with: npm run db:migrate
+// Vercel also runs it on every deploy (see "vercel-build" in package.json).
 import { migrate as migrateNeon } from "drizzle-orm/neon-serverless/migrator";
 import { migrate as migratePg } from "drizzle-orm/node-postgres/migrator";
 import { drizzle as drizzleNeon } from "drizzle-orm/neon-serverless";
@@ -10,7 +11,13 @@ import { isNeonUrl } from "../src/db";
 
 async function main() {
   const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
+  if (!url) {
+    if (process.argv.includes("--skip-if-no-db")) {
+      console.warn("DATABASE_URL is not set; skipping migrations.");
+      return;
+    }
+    throw new Error("DATABASE_URL is not set");
+  }
   if (isNeonUrl(url)) {
     neonConfig.webSocketConstructor = ws;
     const pool = new NeonPool({ connectionString: url });
