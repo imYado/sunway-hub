@@ -197,8 +197,8 @@ test("delete by admin (with reason) and by poster", async ({ browser }) => {
   await Promise.all([alice.close(), admin.close()]);
 });
 
-test("accessibility: main pages have no serious axe violations", async ({ browser }) => {
-  const context = await browser.newContext();
+for (const colorScheme of ["light", "dark"] as const) test(`accessibility (${colorScheme} mode): main pages have no serious axe violations`, async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme });
   const page = await context.newPage();
   const check = async (path: string) => {
     await page.goto(path);
@@ -212,4 +212,17 @@ test("accessibility: main pages have no serious axe violations", async ({ browse
     await check(p);
   }
   await context.close();
+});
+
+test("pop-up menu closes on an outside click and on Escape", async ({ page }) => {
+  await signInMember(page, BOB);
+  const menu = page.locator("details[data-popup]");
+  await page.getByLabel("Menu").click();
+  await expect(menu).toHaveAttribute("open", "");
+  await page.locator("main").click({ position: { x: 5, y: 5 } });
+  await expect(menu).not.toHaveAttribute("open", "");
+  await page.getByLabel("Menu").click();
+  await expect(menu).toHaveAttribute("open", "");
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toHaveAttribute("open", "");
 });

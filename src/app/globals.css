@@ -2,30 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Flat design: solid colours, 1px borders, no gradients, shadows or blur. */
+/* Monochrome design. Colours are RGB channels so Tailwind can apply opacity.
+   Light mode by default; dark mode follows the device unless the member picked one. */
 :root {
   color-scheme: light;
+  --bg: 255 255 255; /* #FFFFFF */
+  --surface: 242 242 242; /* #F2F2F2 */
+  --ink: 10 10 10; /* #0A0A0A */
+  --muted: 95 95 95; /* #5F5F5F */
+  --line: 229 229 229; /* #E5E5E5 */
+  --danger: 185 28 28; /* #B91C1C */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: 10 10 10; /* #0A0A0A */
+    --surface: 23 23 23; /* #171717 */
+    --ink: 255 255 255; /* #FFFFFF */
+    --muted: 163 163 163; /* #A3A3A3 */
+    --line: 42 42 42; /* #2A2A2A */
+    --danger: 248 113 113; /* #F87171 */
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: 10 10 10;
+  --surface: 23 23 23;
+  --ink: 255 255 255;
+  --muted: 163 163 163;
+  --line: 42 42 42;
+  --danger: 248 113 113;
 }
 
 html {
-  background: #ffffff;
-  color: #111111;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  font-family: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-feature-settings: "cv11", "ss01";
+  font-family: "Hanken Grotesk Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings and titles: Archivo, heavy, slightly tight. The extra :root raises specificity
+   above Tailwind's font-weight utilities so every heading gets the display style. */
+:root :is(h1, h2, h3, h4) {
+  font-family: "Archivo Variable", "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+:root :is(h2, h3, h4) {
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 *:focus-visible {
-  outline: 2px solid #1d4ed8;
+  outline: 2px solid rgb(var(--ink));
   outline-offset: 2px;
 }
 
 a {
-  color: #1d4ed8;
-  text-underline-offset: 2px;
+  color: inherit;
+  text-underline-offset: 3px;
 }
 
 a:hover {
@@ -37,28 +84,56 @@ main a:not([class]) {
   text-decoration: underline;
 }
 
+/* Thin bar at the top while a page is loading, so every click gets instant feedback. */
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 2px;
+  background: rgb(var(--ink));
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+html[data-navigating] .nav-progress {
+  opacity: 1;
+  animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes nav-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded border border-line bg-white px-4 py-2 text-sm font-medium text-ink no-underline hover:bg-surface hover:no-underline disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-full border border-line bg-bg px-5 py-2 text-sm font-medium text-ink no-underline transition-colors duration-100 hover:bg-surface hover:no-underline active:bg-line disabled:cursor-not-allowed disabled:opacity-50;
     min-height: 40px;
+    touch-action: manipulation;
   }
   .btn-primary {
-    @apply border-accent bg-accent text-white hover:border-accent-dark hover:bg-accent-dark;
+    @apply border-ink bg-ink text-on-ink hover:bg-ink/85 active:bg-ink/75;
   }
   .btn-danger {
-    @apply border-danger bg-white text-danger hover:bg-surface;
+    @apply border-danger bg-bg text-danger hover:bg-surface;
   }
   .btn-sm {
-    @apply px-3 py-1;
-    min-height: 32px;
+    @apply px-3.5 py-1;
+    min-height: 34px;
   }
   .input {
-    @apply block w-full rounded border border-line bg-white px-3 py-2 text-base text-ink placeholder:text-muted;
-    min-height: 40px;
+    @apply block w-full rounded border border-line bg-bg px-3 py-2 text-base text-ink transition-colors duration-100 placeholder:text-muted;
+    min-height: 44px;
   }
   .input:focus {
-    @apply border-accent;
-    outline: 2px solid #1d4ed8;
+    @apply border-ink;
+    outline: 1px solid rgb(var(--ink));
     outline-offset: 0;
   }
   .label {
@@ -68,7 +143,7 @@ main a:not([class]) {
     @apply mt-1 text-sm text-muted;
   }
   .card {
-    @apply rounded border border-line bg-white;
+    @apply rounded border border-line bg-bg;
   }
   .surface {
     @apply rounded border border-line bg-surface;
@@ -77,10 +152,13 @@ main a:not([class]) {
     @apply inline-flex items-center rounded border border-line bg-surface px-2 py-0.5 text-sm text-ink;
   }
   .link {
-    @apply text-accent underline underline-offset-2;
+    @apply text-ink underline underline-offset-2;
+  }
+  .prose-legal {
+    max-width: 68ch;
   }
   .prose-legal h1 {
-    @apply mb-4 text-xl font-semibold;
+    @apply mb-6 text-xl font-semibold;
   }
   .prose-legal h2 {
     @apply mb-2 mt-8 text-lg font-semibold;

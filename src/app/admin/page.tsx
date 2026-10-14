@@ -44,7 +44,7 @@ export default async function AdminDashboard() {
           Blob storage: {formatBytes(d.storage.used)} of {formatBytes(d.storage.cap)} ({pct}%)
         </p>
         <div className="mt-2 h-3 w-full rounded bg-skeleton" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Blob storage used">
-          <div className="h-3 rounded" style={{ width: `${pct}%`, background: d.storage.refuse ? "#B91C1C" : d.storage.warn ? "#1D4ED8" : "#15803D" }} />
+          <div className={`h-3 rounded ${d.storage.warn ? "bg-danger" : "bg-ink"}`} style={{ width: `${pct}%` }} />
         </div>
         {d.storage.refuse ? (
           <p className="mt-2 text-sm text-danger">Uploads are refused automatically (90% reached). Clean up storage in Data tools.</p>

@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["sharp", "@node-rs/argon2"],
   experimental: {
+    // Keep recently visited pages for 30 seconds so going back and forth is instant.
+    // Saving a form still refreshes the affected page right away.
+    staleTimes: { dynamic: 30 },
     serverActions: {
       // Profile pictures and club logos (max 2 MB) are uploaded through server actions.
       bodySizeLimit: "3mb",
