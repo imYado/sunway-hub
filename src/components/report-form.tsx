@@ -4,7 +4,7 @@ import { CleanTextarea } from "@/components/ui/clean-input";
 import { REPORT_NOTE_MAX, REPORT_REASONS } from "@/lib/rules";
 import { reportAction } from "@/app/actions/posts";
 
-export function ReportForm({ targetType, targetId }: { targetType: "post" | "user" | "club"; targetId: string }) {
+export function ReportForm({ targetType, targetId }: { targetType: "post" | "user" | "club" | "study_group"; targetId: string }) {
   const id = `report-${targetType}-${targetId}`;
   return (
     <details className="mt-4">

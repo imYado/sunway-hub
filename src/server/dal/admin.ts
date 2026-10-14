@@ -26,7 +26,8 @@ import { AppError, NotFoundError, ReauthRequiredError } from "../errors";
 import { invalidateFilterCache } from "../profanity";
 import { notify, notifyFollowersOfPost } from "./notifications";
 import { assertAdmin, assertNotAdminTarget } from "./policy";
-import { setHidden } from "./reports";
+import { deleteGroup, describeGroup } from "./groups";
+import { setHidden, type ReportTarget } from "./reports";
 import { assertUsernameAvailable, eraseUser, softDeleteFile } from "./users";
 import { storageStatus } from "./uploads";
 
@@ -476,6 +477,12 @@ export async function openReports(actor: Actor) {
       g.link = u ? `/admin/users/${u.id}` : null;
       g.ownerId = u?.id ?? null;
       g.hidden = !!u?.hiddenByReports;
+    } else if (g.targetType === "study_group") {
+      const item = await describeGroup(g.targetId, actor.id);
+      g.label = item ? item.label : "Study group (removed)";
+      g.link = item?.link ?? null;
+      g.ownerId = item?.ownerId ?? null;
+      g.hidden = !!item?.hidden;
     } else {
       const [c] = await db.select().from(clubs).where(eq(clubs.id, g.targetId)).limit(1);
       g.label = c ? `Club: ${c.name}` : "Club (removed)";
@@ -488,7 +495,7 @@ export async function openReports(actor: Actor) {
 
 export async function resolveReports(
   actor: Actor,
-  targetType: "post" | "user" | "club",
+  targetType: ReportTarget,
   targetId: string,
   action: "dismiss" | "remove" | "warn" | "ban",
   note: string,
@@ -502,8 +509,10 @@ export async function resolveReports(
     } else if (targetType === "club") {
       const { adminDeleteClub } = await import("./clubs");
       await adminDeleteClub(actor, targetId, note);
-    } else {
+    } else if (targetType === "user") {
       await setHidden("user", targetId, true);
+    } else {
+      await deleteGroup(actor, targetId, note);
     }
   } else if (action === "warn" || action === "ban") {
     let userId = targetId;
@@ -513,6 +522,10 @@ export async function resolveReports(
       userId = p.authorId;
     } else if (targetType === "club") {
       throw new AppError("Clubs cannot be warned or banned. Remove the club or dismiss the reports.");
+    } else if (targetType !== "user") {
+      const item = await describeGroup(targetId, actor.id);
+      if (!item) throw new NotFoundError();
+      userId = item.ownerId;
     }
     if (action === "warn") await warnUser(actor, userId, note);
     else await banUser(actor, userId, note);

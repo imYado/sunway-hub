@@ -49,6 +49,7 @@ import {
 import { publishLegal, type LegalType } from "@/server/legal";
 import { assertAdmin } from "@/server/dal/policy";
 import { saveSettings } from "@/server/settings";
+import type { ReportTarget } from "@/server/dal/reports";
 import type { Actor } from "@/server/actor-types";
 
 async function admin(): Promise<Actor> {
@@ -254,7 +255,7 @@ export async function resolveReportAction(_: ActionState, fd: FormData): Promise
   return runAction(async () => {
     await resolveReports(
       await admin(),
-      str(fd, "targetType") as "post" | "user" | "club",
+      str(fd, "targetType") as ReportTarget,
       str(fd, "targetId"),
       str(fd, "op") as "dismiss" | "remove" | "warn" | "ban",
       str(fd, "note"),

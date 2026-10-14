@@ -11,6 +11,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -22,6 +23,17 @@ const tsvector = customType<{ data: string }>({
     return "tsvector";
   },
 });
+
+/** Which approved events a member sees on their schedule. An event shows if it matches any source. */
+export interface CalendarPrefs {
+  /** Club events: none, clubs the member follows (the default), all clubs, or the chosen ones. */
+  clubs?: "none" | "following" | "all" | "chosen";
+  clubIds?: string[];
+  /** Events posted by these members. */
+  authorIds?: string[];
+  /** Events posted by members with these roles. */
+  roles?: ("teacher" | "student" | "other")[];
+}
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 
@@ -38,7 +50,7 @@ export const postStatusEnum = pgEnum("post_status", ["pending", "approved", "rej
 export const fileKindEnum = pgEnum("file_kind", ["image", "pdf", "docx", "pptx", "video"]);
 export const storedFilePurposeEnum = pgEnum("stored_file_purpose", ["attachment", "avatar", "club_logo"]);
 export const imageReviewStatusEnum = pgEnum("image_review_status", ["pending", "approved", "rejected"]);
-export const reportTargetEnum = pgEnum("report_target", ["post", "user", "club"]);
+export const reportTargetEnum = pgEnum("report_target", ["post", "user", "club", "study_group"]);
 export const reportReasonEnum = pgEnum("report_reason", [
   "copyright",
   "inappropriate",
@@ -65,6 +77,7 @@ export const clubCategoryEnum = pgEnum("club_category", [
   "Academic/Professional",
   "Student Leadership Body",
 ]);
+export const planKindEnum = pgEnum("plan_kind", ["study", "outing", "other"]);
 export const messageKindEnum = pgEnum("message_kind", ["contact", "takedown"]);
 
 // ---------------------------------------------------------------------------
@@ -91,6 +104,10 @@ export const users = pgTable(
     usernameChangedAt: ts("username_changed_at"),
     // The change before the latest one: members may change their username twice a week.
     usernamePrevChangedAt: ts("username_prev_changed_at"),
+    // Opt-in: the member chose to appear on the contributor leaderboard.
+    showOnLeaderboard: boolean("show_on_leaderboard").notNull().default(false),
+    // Which events appear on the member's schedule (see CalendarPrefs).
+    calendarPrefs: jsonb("calendar_prefs").$type<CalendarPrefs>().notNull().default({}),
     lastSeenAt: ts("last_seen_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
     deletedAt: ts("deleted_at"),
@@ -569,3 +586,98 @@ export const contactMessages = pgTable("contact_messages", {
   handledAt: ts("handled_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Timetables, study groups and group plans
+// ---------------------------------------------------------------------------
+
+// One weekly class or busy slot. Only the owner sees the labels; group members only see
+// that the time is taken.
+export const timetableEntries = pgTable(
+  "timetable_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    day: smallint("day").notNull(), // Monday = 0 ... Sunday = 6
+    startMin: smallint("start_min").notNull(),
+    endMin: smallint("end_min").notNull(),
+    label: text("label").notNull(),
+    location: text("location").notNull().default(""),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("timetable_entries_user").on(t.userId, t.day)],
+);
+
+// Private groups: only members (and the admin, for reports) can see them. People join with
+// the invite link.
+export const studyGroups = pgTable(
+  "study_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    inviteCode: text("invite_code").notNull().unique(),
+    hiddenByReports: boolean("hidden_by_reports").notNull().default(false),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    deletedAt: ts("deleted_at"),
+    deletedBy: uuid("deleted_by"),
+    deleteReason: text("delete_reason"),
+  },
+  (t) => [index("study_groups_owner").on(t.ownerId)],
+);
+
+export const studyGroupMembers = pgTable(
+  "study_group_members",
+  {
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => studyGroups.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: ts("joined_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.userId] }), index("study_group_members_user").on(t.userId)],
+);
+
+export const groupPlans = pgTable(
+  "group_plans",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => studyGroups.id, { onDelete: "cascade" }),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: planKindEnum("kind").notNull().default("study"),
+    title: text("title").notNull(),
+    date: date("date", { mode: "string" }).notNull(),
+    startMin: smallint("start_min"),
+    endMin: smallint("end_min"),
+    location: text("location").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    deletedAt: ts("deleted_at"),
+  },
+  (t) => [index("group_plans_group_date").on(t.groupId, t.date)],
+);
+
+export const groupPlanAttendees = pgTable(
+  "group_plan_attendees",
+  {
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => groupPlans.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.planId, t.userId] })],
+);

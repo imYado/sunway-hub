@@ -13,7 +13,7 @@ import {
   toggleHelpful,
   type CreatePostInput,
 } from "@/server/dal/posts";
-import { createReport } from "@/server/dal/reports";
+import { createReport, type ReportTarget } from "@/server/dal/reports";
 import { toggleFollowClub, toggleFollowSubject } from "@/server/dal/clubs";
 
 export async function createPostAction(input: CreatePostInput): Promise<ActionState> {
@@ -76,7 +76,7 @@ export async function reportAction(_: ActionState, fd: FormData): Promise<Action
   return runAction(async () => {
     const actor = await actorForAction();
     await createReport(actor, {
-      targetType: str(fd, "targetType") as "post" | "user" | "club",
+      targetType: str(fd, "targetType") as ReportTarget,
       targetId: str(fd, "targetId"),
       reason: str(fd, "reason") as "spam",
       note: str(fd, "note"),

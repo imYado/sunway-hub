@@ -9,12 +9,13 @@ import type { Actor } from "../actor-types";
 import { AppError, NotFoundError } from "../errors";
 import { assertClean } from "../profanity";
 import { enforce, LIMITS } from "../rate-limit";
+import { describeGroup, setGroupHidden } from "./groups";
 import { canViewPost } from "./policy";
 
 export const AUTO_HIDE_THRESHOLD = 3;
 
 export const reportSchema = z.object({
-  targetType: z.enum(["post", "user", "club"]),
+  targetType: z.enum(["post", "user", "club", "study_group"]),
   targetId: z.string().uuid(),
   reason: z.enum(["copyright", "inappropriate", "harassment", "exam_material", "spam", "other"]),
   note: z.string().trim().max(REPORT_NOTE_MAX).optional().default(""),
@@ -37,9 +38,14 @@ export async function createReport(actor: Actor, raw: z.input<typeof reportSchem
     const [u] = await db.select().from(users).where(eq(users.id, input.targetId)).limit(1);
     if (!u || u.status === "deleted") throw new NotFoundError();
     if (u.id === actor.id) throw new AppError("You cannot report yourself.");
-  } else {
+  } else if (input.targetType === "club") {
     const [c] = await db.select().from(clubs).where(eq(clubs.id, input.targetId)).limit(1);
     if (!c || c.deletedAt) throw new NotFoundError();
+  } else {
+    // Groups are private, so only their members can report them.
+    const item = await describeGroup(input.targetId, actor.id);
+    if (!item || item.deleted || (!item.viewerIsMember && !actor.isAdmin)) throw new NotFoundError();
+    if (item.ownerId === actor.id) throw new AppError("You cannot report your own group. You can delete it instead.");
   }
 
   const inserted = await db
@@ -56,8 +62,12 @@ export async function createReport(actor: Actor, raw: z.input<typeof reportSchem
   if (Number(r?.n ?? 0) >= AUTO_HIDE_THRESHOLD) await setHidden(input.targetType, input.targetId, true);
 }
 
-export async function setHidden(targetType: "post" | "user" | "club", targetId: string, hidden: boolean) {
-  if (targetType === "post") {
+export type ReportTarget = z.infer<typeof reportSchema>["targetType"];
+
+export async function setHidden(targetType: ReportTarget, targetId: string, hidden: boolean) {
+  if (targetType === "study_group") {
+    await setGroupHidden(targetId, hidden);
+  } else if (targetType === "post") {
     await db.update(posts).set({ hiddenByReports: hidden }).where(eq(posts.id, targetId));
   } else if (targetType === "user") {
     const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, targetId)).limit(1);
