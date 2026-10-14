@@ -27,7 +27,7 @@ import { invalidateFilterCache } from "../profanity";
 import { notify, notifyFollowersOfPost } from "./notifications";
 import { assertAdmin, assertNotAdminTarget } from "./policy";
 import { setHidden } from "./reports";
-import { eraseUser, softDeleteFile } from "./users";
+import { assertUsernameAvailable, eraseUser, softDeleteFile } from "./users";
 import { storageStatus } from "./uploads";
 
 /** Sensitive admin actions require the password to have been entered recently. */
@@ -367,6 +367,22 @@ export async function setRoleLabel(actor: Actor, userId: string, role: "student"
     .set({ roleLabel: role, ...(role !== "teacher" ? { teacherVerified: false } : {}) })
     .where(eq(users.id, userId));
   await audit(actor, "user.role_label", { type: "user", id: userId }, null, { role });
+}
+
+/** Admin-only rename. Unlike members, the admin can give out two-character usernames, and the 30-day limit does not apply. */
+export async function setUsername(actor: Actor, userId: string, raw: string) {
+  assertAdmin(actor);
+  const username = raw.trim().toLowerCase();
+  const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!u || u.status === "deleted") throw new NotFoundError();
+  if (!u.onboardedAt) throw new AppError("This member has not finished signing up yet.");
+  if (username === u.username) return;
+  await assertUsernameAvailable(username, userId, { allowShort: true });
+  await db.update(users).set({ username }).where(eq(users.id, userId));
+  await audit(actor, "user.username", { type: "user", id: userId }, null, { from: u.username, to: username });
+  if (userId !== actor.id) {
+    await notify([userId], { kind: "decision", title: `The admin changed your username to @${username}`, link: "/settings" });
+  }
 }
 
 export async function suspendUser(actor: Actor, userId: string, days: number, reason: string) {
