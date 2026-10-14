@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkPassword, isAcceptablePassword } from "@/lib/password-strength";
-import { usernameProblem, slugify } from "@/lib/rules";
+import { nextUsernameChange, usernameProblem, slugify } from "@/lib/rules";
 import { parseCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatTime, parseKlInput } from "@/lib/dates";
 
@@ -15,6 +15,13 @@ describe("usernames", () => {
   it("allows two-character usernames only when the admin gives them", () => {
     expect(usernameProblem("ab", { allowShort: true })).toBeNull();
     expect(usernameProblem("a", { allowShort: true })).not.toBeNull();
+    expect(usernameProblem("ab")).toBe("Not allowed.");
+  });
+  it("works out when the next username change is allowed", () => {
+    const now = Date.UTC(2026, 9, 14);
+    expect(nextUsernameChange(null, now)).toBeNull();
+    expect(nextUsernameChange(new Date(now - 8 * 86_400_000), now)).toBeNull();
+    expect(nextUsernameChange(new Date(now - 86_400_000), now)?.getTime()).toBe(now + 6 * 86_400_000);
   });
 });
 

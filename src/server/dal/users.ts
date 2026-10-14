@@ -21,7 +21,7 @@ import {
   userConsents,
   users,
 } from "@/db/schema";
-import { BIO_MAX, DISPLAY_NAME_MAX, USERNAME_CHANGE_DAYS, usernameProblem } from "@/lib/rules";
+import { BIO_MAX, DISPLAY_NAME_MAX, USERNAME_CHANGES_PER_WEEK, nextUsernameChange, usernameProblem } from "@/lib/rules";
 import type { Actor } from "../actor-types";
 import { audit } from "../audit";
 import { verifyOtp, issueOtp } from "../auth/otp";
@@ -80,7 +80,6 @@ export async function completeOnboarding(
       pronouns: p.pronouns,
       bio: p.bio || null,
       onboardedAt: new Date(),
-      usernameChangedAt: new Date(),
     })
     .where(eq(users.id, actor.id));
   await recordConsent(actor.id);
@@ -98,8 +97,8 @@ export async function updateProfile(actor: Actor, raw: z.input<typeof profileSch
   await enforce("write", actor.id, LIMITS.writePerUser.limit, LIMITS.writePerUser.window);
   const usernameChanged = p.username !== me.username;
   if (usernameChanged) {
-    if (me.usernameChangedAt && Date.now() - me.usernameChangedAt.getTime() < USERNAME_CHANGE_DAYS * 86_400_000) {
-      throw new AppError(`You can change your username once every ${USERNAME_CHANGE_DAYS} days.`);
+    if (!actor.isAdmin && nextUsernameChange(me.usernamePrevChangedAt)) {
+      throw new AppError(`You can change your username ${USERNAME_CHANGES_PER_WEEK} times a week.`);
     }
     await assertUsernameAvailable(p.username, actor.id, { allowShort: actor.isAdmin });
   }
@@ -115,7 +114,7 @@ export async function updateProfile(actor: Actor, raw: z.input<typeof profileSch
       bio: p.bio || null,
       // Changing role away from teacher removes the badge; becoming a teacher again needs re-verification.
       teacherVerified: p.roleLabel === "teacher" && !becameTeacher ? me.teacherVerified : false,
-      ...(usernameChanged ? { usernameChangedAt: new Date() } : {}),
+      ...(usernameChanged ? { usernameChangedAt: new Date(), usernamePrevChangedAt: me.usernameChangedAt } : {}),
     })
     .where(eq(users.id, actor.id));
 }

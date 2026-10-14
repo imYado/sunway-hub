@@ -178,7 +178,7 @@ To restore from a full export instead of Neon, for example when moving to a new 
 - [ ] Redeploy after setting the variables, so the deploy creates the tables and adds the clubs.
 - [ ] Deploy, then confirm the cron job appears under **Vercel > Settings > Cron Jobs**.
 - [ ] Sign in as admin, set the password, finish onboarding and **turn on TOTP**.
-- [ ] Fill in `[CONTACT EMAIL]`, `[OWNER NAME]` and `[EFFECTIVE DATE]` in `src/content/legal/terms.ts` and `privacy.ts`, or edit them in **Admin > Legal**. Have the drafts reviewed; they are not legal advice.
+- [ ] Fill in `[OWNER NAME]` and `[EFFECTIVE DATE]` in `src/content/legal/terms.ts` and `privacy.ts`, or edit them in **Admin > Legal**. Have the drafts reviewed; they are not legal advice.
 - [ ] Send yourself a sign-in code to confirm Gmail delivery, and check it doesn't land in spam.
 - [ ] Upload a test post from a second account, approve it, and delete it again.
 - [ ] Review the blocked-words list under **Admin > Blocked words** and add any local terms.

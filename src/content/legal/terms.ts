@@ -20,7 +20,7 @@ Sunway Hub is free and non-commercial. There are no ads, payments, donations, sp
 
 - You must be a current Sunway student, teacher or staff member with a valid Sunway email address.
 - One account per person. Do not share your account or sign-in codes.
-- You are responsible for activity on your account. Sign out on shared devices and tell us at [CONTACT EMAIL] if you think your account has been misused.
+- You are responsible for activity on your account. Sign out on shared devices and tell us at hubsunway@gmail.com if you think your account has been misused.
 
 ## 3. Your content
 
@@ -48,7 +48,7 @@ Do not upload or post:
 - Every upload is reviewed by the admin before other members can see it.
 - The admin may reject, remove or hide content, and suspend or ban accounts, without notice, to keep the community safe.
 - Content reported by several members may be hidden automatically while it is reviewed.
-- If you disagree with a decision, email [CONTACT EMAIL] with the details and we will look at it again.
+- If you disagree with a decision, email hubsunway@gmail.com with the details and we will look at it again.
 
 ## 6. Academic integrity
 
@@ -76,5 +76,5 @@ We may update these Terms. When we publish a new version, you will be asked to a
 
 ## 12. Contact
 
-Questions about these Terms: **[CONTACT EMAIL]**.
+Questions about these Terms: **hubsunway@gmail.com**.
 `;

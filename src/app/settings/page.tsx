@@ -4,7 +4,7 @@ import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { CleanInput, CleanTextarea } from "@/components/ui/clean-input";
 import { Field } from "@/components/ui/field";
 import { formatDate } from "@/lib/dates";
-import { BIO_MAX, DISPLAY_NAME_MAX, PRONOUN_OPTIONS, ROLE_OPTIONS, USERNAME_CHANGE_DAYS } from "@/lib/rules";
+import { BIO_MAX, DISPLAY_NAME_MAX, PRONOUN_OPTIONS, ROLE_OPTIONS, USERNAME_CHANGES_PER_WEEK, nextUsernameChange } from "@/lib/rules";
 import {
   avatarAction,
   deleteAccountAction,
@@ -25,10 +25,7 @@ export default async function SettingsPage() {
   const me = await getMe(actor);
   const profile = await getProfile(actor, me.username!);
   const notif = await getNotificationSettings(actor);
-  const nextUsernameChange =
-    me.usernameChangedAt && Date.now() - me.usernameChangedAt.getTime() < USERNAME_CHANGE_DAYS * 86_400_000
-      ? new Date(me.usernameChangedAt.getTime() + USERNAME_CHANGE_DAYS * 86_400_000)
-      : null;
+  const nextChange = actor.isAdmin ? null : nextUsernameChange(me.usernamePrevChangedAt);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -45,7 +42,7 @@ export default async function SettingsPage() {
           <Field
             label="Username"
             htmlFor="username"
-            hint={nextUsernameChange ? `You can change your username again on ${formatDate(nextUsernameChange)}.` : `You can change it once every ${USERNAME_CHANGE_DAYS} days.`}
+            hint={nextChange ? `You can change your username again on ${formatDate(nextChange)}.` : actor.isAdmin ? "You can change it as often as you like." : `You can change it ${USERNAME_CHANGES_PER_WEEK} times a week.`}
           >
             <CleanInput id="username" name="username" required pattern="[a-z0-9_]{2,20}" defaultValue={me.username ?? ""} aria-describedby="username-hint" />
           </Field>

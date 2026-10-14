@@ -89,6 +89,8 @@ export const users = pgTable(
     hiddenByReports: boolean("hidden_by_reports").notNull().default(false),
     onboardedAt: ts("onboarded_at"),
     usernameChangedAt: ts("username_changed_at"),
+    // The change before the latest one: members may change their username twice a week.
+    usernamePrevChangedAt: ts("username_prev_changed_at"),
     lastSeenAt: ts("last_seen_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
     deletedAt: ts("deleted_at"),

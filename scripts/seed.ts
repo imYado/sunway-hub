@@ -3,7 +3,7 @@
 // Add --demo to also create a few sample subjects (development only).
 // Vercel runs it with --deploy on every deploy: built-in clubs are then only added
 // to an empty clubs table, so clubs the admin deletes don't come back.
-import { count, eq } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 import { getDb } from "../src/db";
@@ -30,6 +30,12 @@ async function main() {
   ] as const) {
     await db.insert(legalDocuments).values({ type, version: 1, body }).onConflictDoNothing();
   }
+  // Fill in the contact email in documents published before it was set. This only replaces a
+  // placeholder, so members are not asked to accept the documents again.
+  await db
+    .update(legalDocuments)
+    .set({ body: sql`replace(${legalDocuments.body}, '[CONTACT EMAIL]', 'hubsunway@gmail.com')` })
+    .where(sql`${legalDocuments.body} like '%[CONTACT EMAIL]%'`);
   console.log("Legal documents: version 1 present.");
 
   let inserted = 0;

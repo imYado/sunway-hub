@@ -44,7 +44,7 @@ export const SHORT_USERNAME_RE = /^[a-z0-9_]{2}$/;
 
 export function usernameProblem(username: string, opts: { allowShort?: boolean } = {}): string | null {
   if (SHORT_USERNAME_RE.test(username)) {
-    if (!opts.allowShort) return "Two-character usernames can only be given out by the admin.";
+    if (!opts.allowShort) return "Not allowed.";
   } else if (!USERNAME_RE.test(username)) {
     return "Usernames are 3-20 characters: lowercase letters, numbers and underscores.";
   }
@@ -55,7 +55,15 @@ export function usernameProblem(username: string, opts: { allowShort?: boolean }
   return null;
 }
 
-export const USERNAME_CHANGE_DAYS = 30;
+/** Members may change their username this many times in any 7 days. The admin has no limit. */
+export const USERNAME_CHANGES_PER_WEEK = 2;
+const WEEK_MS = 7 * 86_400_000;
+
+/** When a member may next change their username, or null if they can now. */
+export function nextUsernameChange(prevChangedAt: Date | null, now = Date.now()): Date | null {
+  if (!prevChangedAt || now - prevChangedAt.getTime() >= WEEK_MS) return null;
+  return new Date(prevChangedAt.getTime() + WEEK_MS);
+}
 export const BIO_MAX = 160;
 export const DISPLAY_NAME_MAX = 60;
 export const TITLE_MIN = 5;
