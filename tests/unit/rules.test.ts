@@ -12,6 +12,10 @@ describe("usernames", () => {
     "rejects %s",
     (u) => expect(usernameProblem(u)).not.toBeNull(),
   );
+  it("allows two-character usernames only when the admin gives them", () => {
+    expect(usernameProblem("ab", { allowShort: true })).toBeNull();
+    expect(usernameProblem("a", { allowShort: true })).not.toBeNull();
+  });
 });
 
 describe("admin password strength", () => {

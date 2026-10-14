@@ -17,6 +17,7 @@ import {
   suspendUser,
   adminDeleteUser,
   setTeacherVerified,
+  setUsername,
 } from "@/server/dal/admin";
 import { assignClubManager, importSunwayClubs, updateClubAsManager } from "@/server/dal/clubs";
 import { fullBackup } from "@/server/dal/export";
@@ -31,7 +32,7 @@ import {
   toggleHelpful,
 } from "@/server/dal/posts";
 import { createReport } from "@/server/dal/reports";
-import { getAvatarFileForViewer, getProfile, uploadAvatar } from "@/server/dal/users";
+import { getAvatarFileForViewer, getProfile, updateProfile, uploadAvatar } from "@/server/dal/users";
 import { saveSettings, clearSettingsCache } from "@/server/settings";
 import { storage } from "@/server/storage";
 import { SUNWAY_CLUBS } from "@/content/clubs-seed";
@@ -232,6 +233,19 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     await createReport(dave, { targetType: "post", targetId: id, reason: "inappropriate", note: "Looks like an exam paper" });
     await expect(getPostDetail(bob, id)).rejects.toThrow(/could not find/);
     expect((await getPostDetail(alice, id)).hiddenByReports).toBe(true);
+  });
+
+  it("only the admin can give out two-character usernames", async () => {
+    const carol = await makeUser();
+    const profile = { displayName: "Carol", roleLabel: "student" as const, pronouns: "unspecified" as const, bio: "" };
+    await expect(updateProfile(carol, { ...profile, username: "cz" })).rejects.toThrow(/admin/);
+    await expect(setUsername(carol, carol.id, "cz")).rejects.toThrow();
+    await setUsername(admin, carol.id, "cz");
+    const [row] = await db.select().from(users).where(eq(users.id, carol.id));
+    expect(row.username).toBe("cz");
+    // Carol keeps it when saving her other settings.
+    await updateProfile({ ...carol, username: "cz" }, { ...profile, username: "cz", bio: "Hi" });
+    await expect(setUsername(admin, bob.id, "cz")).rejects.toThrow(/taken/);
   });
 
   it("profile: email hidden by default, teacher badge only after verification", async () => {

@@ -31,6 +31,7 @@ import {
   revertTitle,
   setRoleLabel,
   setTeacherVerified,
+  setUsername,
   suspendUser,
   unhidePost,
   warnUser,
@@ -142,6 +143,9 @@ export async function userAction(_: ActionState, fd: FormData): Promise<ActionSt
         break;
       case "unverify_teacher":
         await setTeacherVerified(a, userId, false);
+        break;
+      case "username":
+        await setUsername(a, userId, str(fd, "username"));
         break;
       case "role":
         await setRoleLabel(a, userId, str(fd, "role") as "student" | "teacher" | "other");

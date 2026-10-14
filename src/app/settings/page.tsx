@@ -47,7 +47,7 @@ export default async function SettingsPage() {
             htmlFor="username"
             hint={nextUsernameChange ? `You can change your username again on ${formatDate(nextUsernameChange)}.` : `You can change it once every ${USERNAME_CHANGE_DAYS} days.`}
           >
-            <CleanInput id="username" name="username" required pattern="[a-z0-9_]{3,20}" defaultValue={me.username ?? ""} aria-describedby="username-hint" />
+            <CleanInput id="username" name="username" required pattern="[a-z0-9_]{2,20}" defaultValue={me.username ?? ""} aria-describedby="username-hint" />
           </Field>
           <Field label="Role" htmlFor="roleLabel" hint="Choosing Teacher shows a pending label until the admin verifies it. It does not give extra permissions.">
             <select id="roleLabel" name="roleLabel" defaultValue={me.roleLabel} className="input">

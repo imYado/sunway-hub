@@ -43,8 +43,8 @@ export const profileSchema = z.object({
   bio: z.string().trim().max(BIO_MAX, `Bios can be at most ${BIO_MAX} characters.`).default(""),
 });
 
-async function assertUsernameAvailable(username: string, selfId: string) {
-  const problem = usernameProblem(username);
+export async function assertUsernameAvailable(username: string, selfId: string, opts: { allowShort?: boolean } = {}) {
+  const problem = usernameProblem(username, opts);
   if (problem) throw new AppError(problem);
   await assertClean(username.replace(/_/g, " "), username);
   const [taken] = await db
@@ -101,7 +101,7 @@ export async function updateProfile(actor: Actor, raw: z.input<typeof profileSch
     if (me.usernameChangedAt && Date.now() - me.usernameChangedAt.getTime() < USERNAME_CHANGE_DAYS * 86_400_000) {
       throw new AppError(`You can change your username once every ${USERNAME_CHANGE_DAYS} days.`);
     }
-    await assertUsernameAvailable(p.username, actor.id);
+    await assertUsernameAvailable(p.username, actor.id, { allowShort: actor.isAdmin });
   }
   await assertClean(p.displayName, p.bio);
   const becameTeacher = p.roleLabel === "teacher" && me.roleLabel !== "teacher";

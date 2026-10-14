@@ -87,6 +87,29 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
         </div>
       </dl>
 
+      {u.onboardedAt && u.status !== "deleted" && (
+        <ActionForm action={userAction} className="surface max-w-sm p-3">
+          <input type="hidden" name="userId" value={u.id} />
+          <input type="hidden" name="op" value="username" />
+          <label htmlFor="new-username" className="label">
+            Username
+          </label>
+          <input
+            id="new-username"
+            name="username"
+            required
+            pattern="[a-z0-9_]{2,20}"
+            defaultValue={u.username ?? ""}
+            aria-describedby="new-username-hint"
+            className="input"
+          />
+          <p id="new-username-hint" className="mb-2 mt-1 text-sm text-muted">
+            2-20 characters. Only you can give out two-character usernames.
+          </p>
+          <SubmitButton size="sm">Change username</SubmitButton>
+        </ActionForm>
+      )}
+
       {data.isAdminAccount ? (
         <p className="surface p-3 text-sm">This is the admin account. It cannot be banned, suspended, signed out, demoted or deleted.</p>
       ) : (

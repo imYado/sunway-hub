@@ -39,9 +39,13 @@ export const RESERVED_USERNAMES = new Set([
 ]);
 
 export const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+/** Two-character usernames exist, but only the admin can hand them out. */
+export const SHORT_USERNAME_RE = /^[a-z0-9_]{2}$/;
 
-export function usernameProblem(username: string): string | null {
-  if (!USERNAME_RE.test(username)) {
+export function usernameProblem(username: string, opts: { allowShort?: boolean } = {}): string | null {
+  if (SHORT_USERNAME_RE.test(username)) {
+    if (!opts.allowShort) return "Two-character usernames can only be given out by the admin.";
+  } else if (!USERNAME_RE.test(username)) {
     return "Usernames are 3-20 characters: lowercase letters, numbers and underscores.";
   }
   const bare = username.replace(/_/g, "");
