@@ -64,9 +64,9 @@ export default async function OnboardingPage() {
             id="username"
             name="username"
             required
-            minLength={3}
+            minLength={2}
             maxLength={20}
-            pattern="[a-z0-9_]{3,20}"
+            pattern="[a-z0-9_]{2,20}"
             autoCapitalize="none"
             autoComplete="username"
             aria-describedby="username-hint"

@@ -238,7 +238,7 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
   it("only the admin can give out two-character usernames", async () => {
     const carol = await makeUser();
     const profile = { displayName: "Carol", roleLabel: "student" as const, pronouns: "unspecified" as const, bio: "" };
-    await expect(updateProfile(carol, { ...profile, username: "cz" })).rejects.toThrow(/admin/);
+    await expect(updateProfile(carol, { ...profile, username: "cz" })).rejects.toThrow("Not allowed.");
     await expect(setUsername(carol, carol.id, "cz")).rejects.toThrow();
     await setUsername(admin, carol.id, "cz");
     const [row] = await db.select().from(users).where(eq(users.id, carol.id));
@@ -246,6 +246,25 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     // Carol keeps it when saving her other settings.
     await updateProfile({ ...carol, username: "cz" }, { ...profile, username: "cz", bio: "Hi" });
     await expect(setUsername(admin, bob.id, "cz")).rejects.toThrow(/taken/);
+  });
+
+  it("members can change their username twice a week; the admin has no limit", async () => {
+    const dave = await makeUser();
+    const profile = { displayName: "Dave", roleLabel: "student" as const, pronouns: "unspecified" as const, bio: "" };
+    const me = async () => (await db.select().from(users).where(eq(users.id, dave.id)))[0];
+    await updateProfile(dave, { ...profile, username: "dave_one" });
+    await updateProfile(dave, { ...profile, username: "dave_two" });
+    await expect(updateProfile(dave, { ...profile, username: "dave_three" })).rejects.toThrow(/2 times a week/);
+    // A week after the first of the two changes, one more is allowed.
+    await db.update(users).set({ usernamePrevChangedAt: new Date(Date.now() - 8 * 86_400_000) }).where(eq(users.id, dave.id));
+    await updateProfile(dave, { ...profile, username: "dave_three" });
+    expect((await me()).username).toBe("dave_three");
+
+    const adminProfile = { ...profile, displayName: "Admin" };
+    for (const name of ["boss_a", "boss_b", "boss_c", "mq"]) await updateProfile(admin, { ...adminProfile, username: name });
+    await setUsername(admin, dave.id, "dave_four");
+    await setUsername(admin, dave.id, "dave_five");
+    expect((await me()).username).toBe("dave_five");
   });
 
   it("profile: email hidden by default, teacher badge only after verification", async () => {

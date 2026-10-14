@@ -17,7 +17,7 @@ export default async function CopyrightPage() {
         </p>
         <p>
           If you are a rights holder or a lecturer and you believe content on Sunway Hub uses your work without permission, tell us using the
-          form below or email <strong>[CONTACT EMAIL]</strong>.
+          form below or email <a href="mailto:hubsunway@gmail.com">hubsunway@gmail.com</a>.
         </p>
         <ul className="list-disc space-y-1 pl-6">
           <li>When a request names a post on this site, the post is hidden immediately while we review it.</li>

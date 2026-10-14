@@ -14,7 +14,7 @@ This Privacy Policy explains how Sunway Hub ("we", "us", "the site") collects, u
 
 Sunway Hub is run by an individual student, [OWNER NAME], as a personal, unofficial and non-commercial project. It is **not** affiliated with, endorsed by, or operated by Sunway University or the Sunway Group.
 
-For any privacy question or request, email **[CONTACT EMAIL]**.
+For any privacy question or request, email **hubsunway@gmail.com**.
 
 ## 2. What we collect
 
@@ -74,7 +74,7 @@ You have the right to:
 - **Withdraw consent**: delete your account, or email us.
 - **Limit** emails: change your notification settings at any time.
 
-To make a request by email, write to **[CONTACT EMAIL]** from your Sunway email address. We aim to reply within 21 days.
+To make a request by email, write to **hubsunway@gmail.com** from your Sunway email address. We aim to reply within 21 days.
 
 ## 8. Security and data breaches
 
@@ -94,5 +94,5 @@ We may update this policy. When we publish a new version, you will be asked to r
 
 ## 12. Contact
 
-Questions or requests: **[CONTACT EMAIL]**.
+Questions or requests: **hubsunway@gmail.com**.
 `;
