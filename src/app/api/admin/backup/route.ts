@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     return new Response(JSON.stringify(data), {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": `attachment; filename="sunway-hub-backup-${klDayKey()}.json"`,
+        "Content-Disposition": `attachment; filename="sj-study-backup-${klDayKey()}.json"`,
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "private, no-store",
       },

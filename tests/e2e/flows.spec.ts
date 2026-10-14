@@ -43,7 +43,7 @@ test("admin first-time sign-in: code, create password, then password sign-in", a
   await page.getByLabel("New password").fill(ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Save password" }).click();
   // Onboarding (admin needs a username too).
-  await expect(page.getByRole("heading", { name: "Welcome to Sunway Hub" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to SJ Study" })).toBeVisible();
   await page.getByLabel("Full name").fill("Site Admin");
   await page.getByLabel("Username").fill("hub_owner");
   await page.getByLabel(/I have read and accept/).check();

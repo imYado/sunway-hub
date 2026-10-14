@@ -24,7 +24,7 @@ export function buildIcs(e: { uid: string; title: string; description: string; l
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Sunway Hub//Events//EN",
+    "PRODID:-//SJ Study//Events//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",

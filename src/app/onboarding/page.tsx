@@ -42,7 +42,7 @@ export default async function OnboardingPage() {
     return (
       <div className="mx-auto max-w-lg">
         <h1 className="text-xl font-semibold">We have updated our policies</h1>
-        <p className="mb-6 mt-2 text-muted">Please read the latest Terms and Privacy Policy and accept them to keep using Sunway Hub.</p>
+        <p className="mb-6 mt-2 text-muted">Please read the latest Terms and Privacy Policy and accept them to keep using SJ Study.</p>
         <ActionForm action={onboardingAction}>
           {consentBox}
           <SubmitButton>Accept and continue</SubmitButton>
@@ -53,7 +53,7 @@ export default async function OnboardingPage() {
 
   return (
     <div className="mx-auto max-w-lg">
-      <h1 className="text-xl font-semibold">Welcome to Sunway Hub</h1>
+      <h1 className="text-xl font-semibold">Welcome to SJ Study</h1>
       <p className="mb-6 mt-2 text-muted">Set up your profile. This only takes a minute.</p>
       <ActionForm action={onboardingAction}>
         <Field label="Full name" htmlFor="displayName">

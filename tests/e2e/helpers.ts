@@ -31,7 +31,7 @@ export async function signInMember(page: Page, email: string, username?: string)
   await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Sign in" }).click();
   if (username) {
-    await expect(page.getByRole("heading", { name: "Welcome to Sunway Hub" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome to SJ Study" })).toBeVisible();
     await page.getByLabel("Full name").fill(`Test ${username}`);
     await page.getByLabel("Username").fill(username);
     await page.getByLabel(/I have read and accept/).check();

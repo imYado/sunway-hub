@@ -22,6 +22,6 @@ export function totpCode(secret: string): string {
 }
 
 export async function totpQrDataUrl(secret: string, account: string): Promise<string> {
-  const uri = authenticator.keyuri(account, "Sunway Hub", secret);
+  const uri = authenticator.keyuri(account, "SJ Study", secret);
   return QRCode.toDataURL(uri, { margin: 1, width: 220, color: { dark: "#111111", light: "#FFFFFF" } });
 }

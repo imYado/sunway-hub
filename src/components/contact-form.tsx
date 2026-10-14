@@ -14,7 +14,7 @@ export function ContactForm({ kind, defaultName, defaultEmail }: { kind: "contac
         <input id={`${kind}-email`} name="email" type="email" required className="input" defaultValue={defaultEmail} autoComplete="email" />
       </Field>
       {kind === "takedown" ? (
-        <Field label="Link to the content" htmlFor="takedown-url" hint="For example the address of the post on Sunway Hub.">
+        <Field label="Link to the content" htmlFor="takedown-url" hint="For example the address of the post on SJ Study.">
           <input id="takedown-url" name="contentUrl" type="url" required className="input" placeholder="https://.../posts/..." />
         </Field>
       ) : (

@@ -49,7 +49,7 @@ export async function sendEmail(msg: EmailMessage): Promise<boolean> {
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: msg.to,
       subject: msg.subject,
-      text: `${msg.text}\n\n--\nSunway Hub is an unofficial, student-run, non-commercial site. It is not affiliated with or endorsed by Sunway University.`,
+      text: `${msg.text}\n\n--\nSJ Study is an unofficial, student-run, non-commercial site. It is not affiliated with or endorsed by Sunway University.`,
     });
     return true;
   } catch (err) {

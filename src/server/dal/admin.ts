@@ -432,7 +432,7 @@ export async function warnUser(actor: Actor, userId: string, message: string) {
     .update(users)
     .set({ warningCount: sql`${users.warningCount} + 1` })
     .where(eq(users.id, userId));
-  await notify([userId], { kind: "system", title: "A warning from the Sunway Hub admin", body: message, link: "/guidelines" });
+  await notify([userId], { kind: "system", title: "A warning from the SJ Study admin", body: message, link: "/guidelines" });
   await audit(actor, "user.warn", { type: "user", id: userId }, message);
 }
 
