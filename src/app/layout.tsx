@@ -10,7 +10,7 @@ import { unreadCount } from "@/server/dal/notifications";
 import { getSettings } from "@/server/settings";
 
 export const metadata: Metadata = {
-  title: { default: "Sunway Hub", template: "%s | Sunway Hub" },
+  title: { default: "SJ Study", template: "%s | SJ Study" },
   description: "Unofficial, student-run study resources and campus events for the Sunway community.",
   robots: { index: false, follow: false },
 };
@@ -53,7 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-8">
           {maintenance ? (
             <div className="surface p-6">
-              <h1 className="text-lg font-semibold">Sunway Hub is down for maintenance</h1>
+              <h1 className="text-lg font-semibold">SJ Study is down for maintenance</h1>
               <p className="mt-2 text-muted">We are making some improvements. Please check back soon.</p>
             </div>
           ) : (

@@ -134,8 +134,8 @@ export async function sendDigests(maxEmails = 400) {
     const lines = items.map((i) => `- ${i.title}${i.body ? `\n  ${i.body.replace(/\n+/g, " ")}` : ""}${i.link ? `\n  ${env.appUrl}${i.link}` : ""}`);
     const ok = await sendEmail({
       to: u.email,
-      subject: `Sunway Hub: ${items.length} update${items.length === 1 ? "" : "s"} for you`,
-      text: `Here is your daily Sunway Hub summary.\n\n${lines.join("\n\n")}\n\nChange which emails you get in Settings: ${env.appUrl}/settings`,
+      subject: `SJ Study: ${items.length} update${items.length === 1 ? "" : "s"} for you`,
+      text: `Here is your daily SJ Study summary.\n\n${lines.join("\n\n")}\n\nChange which emails you get in Settings: ${env.appUrl}/settings`,
     });
     if (ok) {
       await db

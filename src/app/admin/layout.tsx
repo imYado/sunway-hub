@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { requireAdminPage } from "@/server/actor";
 
-export const metadata: Metadata = { title: { default: "Admin", template: "%s | Admin | Sunway Hub" } };
+export const metadata: Metadata = { title: { default: "Admin", template: "%s | Admin | SJ Study" } };
 
 const SECTIONS = [
   { href: "/admin", label: "Dashboard" },

@@ -12,11 +12,11 @@ export default async function CopyrightPage() {
       <h1 className="text-xl font-semibold">Copyright and Takedown</h1>
       <div className="mt-4 space-y-4">
         <p>
-          Sunway Hub only allows members to share work they own or have permission to share. Lecturers&apos; slides, textbooks, exam papers and
+          SJ Study only allows members to share work they own or have permission to share. Lecturers&apos; slides, textbooks, exam papers and
           assessment solutions are not allowed.
         </p>
         <p>
-          If you are a rights holder or a lecturer and you believe content on Sunway Hub uses your work without permission, tell us using the
+          If you are a rights holder or a lecturer and you believe content on SJ Study uses your work without permission, tell us using the
           form below or email <a href="mailto:hubsunway@gmail.com">hubsunway@gmail.com</a>.
         </p>
         <ul className="list-disc space-y-1 pl-6">

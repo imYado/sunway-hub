@@ -9,6 +9,7 @@ export const RESERVED_USERNAMES = new Set([
   "help",
   "sunway",
   "sunwayhub",
+  "sjstudy",
   "sunwayuni",
   "sunwayuniversity",
   "moderator",

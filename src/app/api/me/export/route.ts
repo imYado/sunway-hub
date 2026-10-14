@@ -9,7 +9,7 @@ export async function GET() {
   return new Response(JSON.stringify(data, null, 2), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": `attachment; filename="sunway-hub-my-data-${klDayKey()}.json"`,
+      "Content-Disposition": `attachment; filename="sj-study-my-data-${klDayKey()}.json"`,
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, no-store",
     },

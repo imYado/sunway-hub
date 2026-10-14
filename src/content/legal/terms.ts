@@ -8,15 +8,15 @@ export const TERMS_TEMPLATE = `# Terms and Conditions
 
 Effective date: [EFFECTIVE DATE]
 
-Welcome to Sunway Hub. By signing in and using the site you agree to these Terms. Please read them together with our Privacy Policy and Community Guidelines.
+Welcome to SJ Study. By signing in and using the site you agree to these Terms. Please read them together with our Privacy Policy and Community Guidelines.
 
 ## 1. Unofficial, non-commercial service
 
-Sunway Hub is an unofficial, student-run project run by [OWNER NAME]. It is **not affiliated with or endorsed by Sunway University** or the Sunway Group. The Sunway name is used only to describe who the site is for.
+SJ Study is an unofficial, student-run project run by [OWNER NAME]. It is **not affiliated with or endorsed by Sunway University** or the Sunway Group. The Sunway name is used only to describe who the site is for.
 
-Sunway Hub is free and non-commercial. There are no ads, payments, donations, sponsorships, paid features or marketplace, and you may not use the site to sell or advertise anything.
+SJ Study is free and non-commercial. There are no ads, payments, donations, sponsorships, paid features or marketplace, and you may not use the site to sell or advertise anything.
 
-## 2. Who can use Sunway Hub
+## 2. Who can use SJ Study
 
 - You must be a current Sunway student, teacher or staff member with a valid Sunway email address.
 - One account per person. Do not share your account or sign-in codes.
@@ -25,7 +25,7 @@ Sunway Hub is free and non-commercial. There are no ads, payments, donations, sp
 ## 3. Your content
 
 - You keep ownership of everything you upload.
-- By uploading, you give Sunway Hub a non-exclusive, royalty-free licence to store your content and show it to signed-in members, for as long as it stays on the site.
+- By uploading, you give SJ Study a non-exclusive, royalty-free licence to store your content and show it to signed-in members, for as long as it stays on the site.
 - You promise that you own what you upload or have permission to share it, and that it follows these Terms and the Community Guidelines.
 
 ## 4. What you must not post
@@ -52,15 +52,15 @@ Do not upload or post:
 
 ## 6. Academic integrity
 
-Sunway Hub is for sharing your own study notes and helping each other learn. You remain fully responsible for following Sunway University's own rules, including its academic integrity and assessment policies. Using material from Sunway Hub does not make it acceptable to submit it as your own work.
+SJ Study is for sharing your own study notes and helping each other learn. You remain fully responsible for following Sunway University's own rules, including its academic integrity and assessment policies. Using material from SJ Study does not make it acceptable to submit it as your own work.
 
 ## 7. No guarantees
 
-Sunway Hub is provided "as is" and "as available". We do not guarantee that the site will always be available, error-free, or that content shared by members is accurate. Always check important information with your lecturer or official Sunway sources.
+SJ Study is provided "as is" and "as available". We do not guarantee that the site will always be available, error-free, or that content shared by members is accurate. Always check important information with your lecturer or official Sunway sources.
 
 ## 8. Limited liability
 
-To the extent allowed by law, Sunway Hub and its owner are not liable for any loss or damage arising from your use of the site or from content posted by members.
+To the extent allowed by law, SJ Study and its owner are not liable for any loss or damage arising from your use of the site or from content posted by members.
 
 ## 9. Ending your use
 

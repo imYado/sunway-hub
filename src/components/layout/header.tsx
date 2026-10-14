@@ -14,7 +14,7 @@ export function SiteHeader({ actor, unread }: { actor: Actor | null; unread: num
     <header className="border-b border-line bg-white">
       <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
         <Link href="/" className="text-lg font-semibold text-ink hover:no-underline">
-          Sunway Hub
+          SJ Study
         </Link>
         {actor && (
           <>

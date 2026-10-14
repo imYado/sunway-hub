@@ -123,7 +123,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
           Club managers
         </h2>
         {detail.managers.length === 0 ? (
-          <p className="text-sm text-muted">This club has no managers on Sunway Hub yet.</p>
+          <p className="text-sm text-muted">This club has no managers on SJ Study yet.</p>
         ) : (
           <ul className="flex flex-wrap gap-4 text-sm">
             {detail.managers.map((m) => (

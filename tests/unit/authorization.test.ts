@@ -188,7 +188,7 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
   });
 
   it("admin posts are auto-approved", async () => {
-    const { status } = await newStudyPost(admin, "Welcome to Sunway Hub");
+    const { status } = await newStudyPost(admin, "Welcome to SJ Study");
     expect(status).toBe("approved");
   });
 

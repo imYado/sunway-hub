@@ -1,8 +1,8 @@
-# Sunway Hub
+# SJ Study
 
 An unofficial, student-run, non-commercial study and events site for the Sunway University community. Members sign in with their Sunway email, share study notes, follow clubs and RSVP to events. Every post, profile picture and club logo is approved by the single site admin before anyone else can see it.
 
-Sunway Hub is not affiliated with or endorsed by Sunway University or Sunway Group. It uses no Sunway logo or brand colours.
+SJ Study is not affiliated with or endorsed by Sunway University or Sunway Group. It uses no Sunway logo or brand colours.
 
 ## Stack
 
@@ -83,10 +83,10 @@ If Playwright can't find its browser, set `PLAYWRIGHT_CHROMIUM_PATH` to a Chromi
 
 ### 4. Gmail app password (email)
 
-1. Create a **dedicated** Gmail account for the site, for example `sunwayhub.noreply@gmail.com`. Don't use a personal account.
+1. Create a **dedicated** Gmail account for the site, for example `sjstudy.noreply@gmail.com`. Don't use a personal account.
 2. Turn on **2-Step Verification** for it: Google Account > Security.
-3. Open **Google Account > Security > App passwords**, create one named "Sunway Hub", and copy the 16-character password.
-4. Set `SMTP_USER` to the Gmail address, `SMTP_APP_PASSWORD` to the app password with spaces removed, and `SMTP_FROM` to `"Sunway Hub <that address>"`.
+3. Open **Google Account > Security > App passwords**, create one named "SJ Study", and copy the 16-character password.
+4. Set `SMTP_USER` to the Gmail address, `SMTP_APP_PASSWORD` to the app password with spaces removed, and `SMTP_FROM` to `"SJ Study <that address>"`.
 
 Gmail allows roughly 500 messages a day. That is why every non-urgent notification is batched into one daily digest, and the digest job stops at 400 emails per run.
 
@@ -103,7 +103,7 @@ Gmail allows roughly 500 messages a day. That is why every non-urgent notificati
 | `ALLOWED_EMAIL_DOMAINS` | yes | `imail.sunway.edu.my,sunway.edu.my`. Exact domains only, so subdomains and lookalikes are rejected |
 | `SMTP_USER`, `SMTP_APP_PASSWORD`, `SMTP_FROM` | yes | Gmail settings from step 4 |
 | `CRON_SECRET` | yes | Random string. Vercel Cron sends it as a Bearer token |
-| `APP_URL` | yes | Public URL with no trailing slash, e.g. `https://sunwayhub.vercel.app` |
+| `APP_URL` | yes | Public URL with no trailing slash, e.g. `https://sjstudy.vercel.app` |
 | `STORAGE_CAP_GB` | yes | Blob allowance in GB. Uploads show a warning at 80% and are refused at 90% |
 
 Generate the secrets with:

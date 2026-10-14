@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const DISCLAIMER =
-  "Sunway Hub is an unofficial, student-run, non-commercial project. It is not affiliated with or endorsed by Sunway University.";
+  "SJ Study is an unofficial, student-run, non-commercial project. It is not affiliated with or endorsed by Sunway University.";
 
 export function SiteFooter() {
   return (

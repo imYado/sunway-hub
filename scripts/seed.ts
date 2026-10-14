@@ -30,12 +30,18 @@ async function main() {
   ] as const) {
     await db.insert(legalDocuments).values({ type, version: 1, body }).onConflictDoNothing();
   }
-  // Fill in the contact email in documents published before it was set. This only replaces a
-  // placeholder, so members are not asked to accept the documents again.
-  await db
-    .update(legalDocuments)
-    .set({ body: sql`replace(${legalDocuments.body}, '[CONTACT EMAIL]', 'hubsunway@gmail.com')` })
-    .where(sql`${legalDocuments.body} like '%[CONTACT EMAIL]%'`);
+  // Bring documents published before launch up to date: fill in the contact email and use the
+  // site's current name. Neither changes what members agreed to, so they are not asked to
+  // accept the documents again.
+  for (const [from, to] of [
+    ["[CONTACT EMAIL]", "hubsunway@gmail.com"],
+    ["Sunway Hub", "SJ Study"],
+  ]) {
+    await db
+      .update(legalDocuments)
+      .set({ body: sql`replace(${legalDocuments.body}, ${from}, ${to})` })
+      .where(sql`strpos(${legalDocuments.body}, ${from}) > 0`);
+  }
   console.log("Legal documents: version 1 present.");
 
   let inserted = 0;

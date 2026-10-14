@@ -1,4 +1,4 @@
-# Handing over Sunway Hub
+# Handing over SJ Study
 
 Read this when the current owner, the admin in `ADMIN_EMAIL`, is about to graduate or step away. Start the handover a few weeks before the owner's Sunway email stops working. Accounts tied to that email can't be recovered afterwards.
 

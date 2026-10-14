@@ -8,17 +8,17 @@ export const PRIVACY_TEMPLATE = `# Privacy Policy
 
 Effective date: [EFFECTIVE DATE]
 
-This Privacy Policy explains how Sunway Hub ("we", "us", "the site") collects, uses and protects your personal data. We follow Malaysia's Personal Data Protection Act 2010 (as amended in 2024).
+This Privacy Policy explains how SJ Study ("we", "us", "the site") collects, uses and protects your personal data. We follow Malaysia's Personal Data Protection Act 2010 (as amended in 2024).
 
-## 1. Who runs Sunway Hub
+## 1. Who runs SJ Study
 
-Sunway Hub is run by an individual student, [OWNER NAME], as a personal, unofficial and non-commercial project. It is **not** affiliated with, endorsed by, or operated by Sunway University or the Sunway Group.
+SJ Study is run by an individual student, [OWNER NAME], as a personal, unofficial and non-commercial project. It is **not** affiliated with, endorsed by, or operated by Sunway University or the Sunway Group.
 
 For any privacy question or request, email **hubsunway@gmail.com**.
 
 ## 2. What we collect
 
-When you use Sunway Hub we collect:
+When you use SJ Study we collect:
 
 - Your Sunway email address (used to sign in).
 - Your name, username, bio, pronouns and role (student, teacher or other).
@@ -27,7 +27,7 @@ When you use Sunway Hub we collect:
 - Your activity on the site: RSVPs, bookmarks, "Helpful" votes, club follows, reports you submit and messages you send us.
 - Technical and security records: a hashed form of your IP address, your browser or device type, and timestamps of sign-ins and actions.
 
-We do **not** collect student IDs, grades, phone numbers or any payment data. Sunway Hub never asks for money.
+We do **not** collect student IDs, grades, phone numbers or any payment data. SJ Study never asks for money.
 
 ## 3. Why we use it, and our legal basis
 
@@ -41,7 +41,7 @@ Our legal basis is your consent, which you give when you tick the box at sign-up
 
 ## 4. Who can see your data
 
-- Sunway Hub is members-only. Only signed-in members can see profiles and approved content.
+- SJ Study is members-only. Only signed-in members can see profiles and approved content.
 - Your email address is **hidden by default**. Other members see it only if you turn on "Show my email" in your settings.
 - Your pending, rejected and "changes requested" posts are visible only to you and the admin.
 - The site admin can see all data, including your email address and all your content, so they can moderate the site.
@@ -86,7 +86,7 @@ We use **one essential cookie** to keep you signed in. We do not use advertising
 
 ## 10. Children and minors
 
-Sunway Hub is for current Sunway students, teachers and staff. If you are under 18, please make sure a parent or guardian is comfortable with you using the site. If we learn that we hold data about a child under 13, we will delete it.
+SJ Study is for current Sunway students, teachers and staff. If you are under 18, please make sure a parent or guardian is comfortable with you using the site. If we learn that we hold data about a child under 13, we will delete it.
 
 ## 11. Changes to this policy
 
