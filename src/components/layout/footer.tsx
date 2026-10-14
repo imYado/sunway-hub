@@ -6,9 +6,9 @@ export const DISCLAIMER =
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-surface">
-      <div className="mx-auto max-w-5xl px-4 py-6 text-sm text-muted">
+      <div className="mx-auto max-w-content px-4 py-10 text-sm text-muted sm:px-6">
         <p>{DISCLAIMER}</p>
-        <nav aria-label="Legal" className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+        <nav aria-label="Legal" className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
           <Link href="/terms">Terms and Conditions</Link>
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/guidelines">Community Guidelines</Link>

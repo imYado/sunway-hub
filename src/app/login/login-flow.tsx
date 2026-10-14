@@ -56,7 +56,7 @@ export function LoginFlow({ initialStep, next }: { initialStep: Step; next?: str
   return (
     <div className="mx-auto w-full max-w-sm">
       <div className="card p-6">
-        <p className="mb-6 text-center text-xl font-semibold">SJ Study</p>
+        <p className="mb-6 text-center font-display text-xl font-extrabold">SJ Study</p>
 
         {step === "email" && (
           <form

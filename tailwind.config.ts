@@ -1,41 +1,49 @@
 import type { Config } from "tailwindcss";
 
-// Flat design system: solid colours only, 1px borders, 6px radius, 8px grid.
-// Gradients, shadows and blur are deliberately disabled below.
+// Monochrome editorial design: black and white with one grey surface, 1px dividers,
+// pill buttons. Light and dark mode share everything except the colour values, which
+// come from CSS variables in globals.css. Gradients, shadows and blur are disabled.
+const v = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     colors: {
       transparent: "transparent",
       current: "currentColor",
-      white: "#FFFFFF",
-      bg: "#FFFFFF",
-      surface: "#F7F7F8",
-      ink: "#111111",
-      muted: "#6B7280",
-      line: "#E5E7EB",
-      accent: { DEFAULT: "#1D4ED8", dark: "#1E40AF" },
-      danger: "#B91C1C",
-      success: "#15803D",
-      skeleton: "#E5E7EB",
+      bg: v("bg"),
+      surface: v("surface"),
+      ink: v("ink"),
+      muted: v("muted"),
+      line: v("line"),
+      // "On ink": text placed on an ink-filled element such as the primary button.
+      "on-ink": v("bg"),
+      white: v("bg"),
+      accent: { DEFAULT: v("ink"), dark: v("ink") },
+      // Red is kept only for errors and destructive actions, so they stay recognisable.
+      danger: v("danger"),
+      success: v("ink"),
+      skeleton: v("line"),
     },
-    borderRadius: { none: "0", DEFAULT: "6px", full: "9999px" },
+    borderRadius: { none: "0", DEFAULT: "8px", full: "9999px" },
     boxShadow: { none: "none" },
     backgroundImage: {},
     backdropBlur: {},
     blur: {},
     dropShadow: {},
     fontFamily: {
-      sans: ['"Inter Variable"', "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
+      sans: ['"Hanken Grotesk Variable"', "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
+      display: ['"Archivo Variable"', '"Hanken Grotesk Variable"', "ui-sans-serif", "system-ui", "sans-serif"],
     },
-    // Max three text sizes in body content: sm, base, lg (plus xl for page titles).
     fontSize: {
-      sm: ["0.875rem", { lineHeight: "1.25rem" }],
-      base: ["1rem", { lineHeight: "1.5rem" }],
-      lg: ["1.25rem", { lineHeight: "1.75rem" }],
-      xl: ["1.75rem", { lineHeight: "2.25rem" }],
+      sm: ["0.9375rem", { lineHeight: "1.5" }],
+      base: ["1.0625rem", { lineHeight: "1.6" }],
+      lg: ["1.5rem", { lineHeight: "1.25", letterSpacing: "-0.02em" }],
+      xl: ["2.5rem", { lineHeight: "1.1", letterSpacing: "-0.035em" }],
     },
-    extend: {},
+    extend: {
+      maxWidth: { content: "1200px" },
+    },
   },
   plugins: [],
 };
