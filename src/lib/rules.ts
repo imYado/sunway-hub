@@ -72,6 +72,25 @@ export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 2000;
 export const REPORT_NOTE_MAX = 500;
 export const MAX_SUBJECT_TAGS = 3;
+// Timetables, study groups and group plans.
+export const TIMETABLE_MAX_ENTRIES = 80;
+export const TIMETABLE_LABEL_MAX = 80;
+export const ICS_MAX_BYTES = 1024 * 1024;
+export const GROUP_NAME_MAX = 60;
+export const GROUP_DESCRIPTION_MAX = 500;
+export const GROUP_MAX_MEMBERS = 30;
+export const GROUPS_PER_USER = 20;
+export const PLAN_NOTES_MAX = 1000;
+export const PLAN_KINDS = [
+  { value: "study", label: "Study session" },
+  { value: "outing", label: "Going out" },
+  { value: "other", label: "Something else" },
+] as const;
+export const EVENT_ROLE_OPTIONS = [
+  { value: "teacher", label: "Verified teachers" },
+  { value: "student", label: "Students" },
+  { value: "other", label: "Staff and others" },
+] as const;
 
 export const PRONOUN_OPTIONS = [
   { value: "he", label: "he" },

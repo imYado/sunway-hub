@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { sendEmail } from "./email";
 import { notify } from "./dal/notifications";
+import { purgeGroups } from "./dal/groups";
 import { PURGE_AFTER_DAYS } from "./dal/posts";
 import { QUARANTINE_PREFIX } from "./dal/uploads";
 import { storage } from "./storage";
@@ -49,12 +50,20 @@ export async function purgeDeleted(now: Date) {
     if (files.length) await db.delete(storedFiles).where(inArray(storedFiles.id, files.map((f) => f.id)));
     await db.delete(clubs).where(eq(clubs.id, c.id));
   }
-  // Deleted accounts with no remaining posts are removed entirely.
+  const groups = await purgeGroups(cutoff);
+  // Deleted accounts with nothing left that shows their (anonymised) authorship are removed entirely.
   const removedUsers = await db
     .delete(users)
-    .where(and(eq(users.status, "deleted"), sql`not exists (select 1 from posts p where p.author_id = ${users.id})`))
+    .where(
+      and(
+        eq(users.status, "deleted"),
+        sql`not exists (select 1 from posts p where p.author_id = ${users.id})`,
+        sql`not exists (select 1 from group_plans p where p.created_by = ${users.id})`,
+        sql`not exists (select 1 from study_groups g where g.owner_id = ${users.id})`,
+      ),
+    )
     .returning({ id: users.id });
-  return { posts: purgedPosts, files: oldFiles.length, clubs: oldClubs.length, users: removedUsers.length };
+  return { posts: purgedPosts, groups, files: oldFiles.length, clubs: oldClubs.length, users: removedUsers.length };
 }
 
 export async function cleanQuarantine(now: Date) {

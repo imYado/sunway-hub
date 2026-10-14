@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { CleanInput, CleanTextarea } from "@/components/ui/clean-input";
@@ -14,6 +15,7 @@ import {
   signOutEverywhereAction,
   updateProfileAction,
 } from "@/app/actions/profile";
+import { leaderboardOptInAction } from "@/app/actions/schedule";
 import { requireMember } from "@/server/actor";
 import { getNotificationSettings } from "@/server/dal/notifications";
 import { getMe, getProfile } from "@/server/dal/users";
@@ -118,6 +120,17 @@ export default async function SettingsPage() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="emailPublic" defaultChecked={me.emailPublic} className="h-4 w-4" />
             Show my email on my profile to other members
+          </label>
+          <div className="mt-3">
+            <SubmitButton variant="default" size="sm">
+              Save
+            </SubmitButton>
+          </div>
+        </ActionForm>
+        <ActionForm action={leaderboardOptInAction} className="mt-6 border-t border-line pt-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="show" defaultChecked={me.showOnLeaderboard} className="h-4 w-4" />
+            Show me on the <Link href="/leaderboard">contributor leaderboard</Link>
           </label>
           <div className="mt-3">
             <SubmitButton variant="default" size="sm">

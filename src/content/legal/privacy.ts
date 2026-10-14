@@ -25,6 +25,7 @@ When you use SJ Study we collect:
 - Your profile picture, if you upload one.
 - Content you upload: posts, descriptions, files, images and videos.
 - Your activity on the site: RSVPs, bookmarks, "Helpful" votes, club follows, reports you submit and messages you send us.
+- Your weekly class timetable, if you add one, and the study groups and plans you make or join. Calendar files you upload are read once and not kept.
 - Technical and security records: a hashed form of your IP address, your browser or device type, and timestamps of sign-ins and actions.
 
 We do **not** collect student IDs, grades, phone numbers or any payment data. SJ Study never asks for money.
@@ -44,6 +45,9 @@ Our legal basis is your consent, which you give when you tick the box at sign-up
 - SJ Study is members-only. Only signed-in members can see profiles and approved content.
 - Your email address is **hidden by default**. Other members see it only if you turn on "Show my email" in your settings.
 - Your pending, rejected and "changes requested" posts are visible only to you and the admin.
+- Your timetable is private. Members of your study groups only see when you are busy or free, never your class names or rooms.
+- Study groups are private: only their members can see the group, its members and its plans.
+- You appear on the contributor leaderboard only if you turn it on in your settings.
 - The site admin can see all data, including your email address and all your content, so they can moderate the site.
 - We do not sell, rent or share your data with anyone for marketing. There are no advertisers.
 

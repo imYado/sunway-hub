@@ -30,6 +30,7 @@ import { assertClean } from "../profanity";
 import { enforce, LIMITS } from "../rate-limit";
 import { recordConsent } from "../legal";
 import { storage } from "../storage";
+import { eraseScheduleData, myScheduleData } from "./groups";
 import { processSquareImage, storageStatus } from "./uploads";
 import { PURGE_AFTER_DAYS } from "./posts";
 
@@ -292,6 +293,7 @@ export async function exportMyData(actor: Actor) {
     clubFollows: await db.select().from(clubFollows).where(eq(clubFollows.userId, actor.id)),
     subjectFollows: await db.select().from(subjectFollows).where(eq(subjectFollows.userId, actor.id)),
     clubManagerRequests: await db.select().from(clubManagerRequests).where(eq(clubManagerRequests.userId, actor.id)),
+    ...(await myScheduleData(actor.id)),
     reportsSubmitted: await db.select().from(reports).where(eq(reports.reporterId, actor.id)),
     notifications: await db.select().from(notifications).where(eq(notifications.userId, actor.id)),
     notificationSettings: await db.select().from(notificationSettings).where(eq(notificationSettings.userId, actor.id)),
@@ -354,6 +356,7 @@ export async function eraseUser(userId: string, mode: "delete_posts" | "anonymis
       })
       .where(eq(users.id, userId));
   });
+  await eraseScheduleData(userId, mode === "delete_posts");
   await audit(by, by && by.id !== userId ? "user.delete_by_admin" : "user.delete_self", { type: "user", id: userId }, reason ?? null, {
     mode,
     purgeAfterDays: PURGE_AFTER_DAYS,

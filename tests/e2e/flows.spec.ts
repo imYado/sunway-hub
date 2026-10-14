@@ -6,6 +6,7 @@ test.describe.configure({ mode: "serial" });
 
 const ALICE = "alice@imail.sunway.edu.my";
 const BOB = "bob@sunway.edu.my";
+const ERIN = "erin@imail.sunway.edu.my";
 let postUrl = "";
 
 test("logged-out visitors only see public pages", async ({ page }) => {
@@ -121,6 +122,73 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await Promise.all([alice.close(), bob.close(), admin.close()]);
 });
 
+test("timetable, study group, free time and plans", async ({ browser }) => {
+  const erinContext = await browser.newContext();
+  const erin = await erinContext.newPage();
+  await signInMember(erin, ERIN, "erin_q");
+  await erin.goto("/schedule/timetable");
+  await ready(erin);
+  // Upload a calendar file: a Monday 09:00-11:00 lecture (01:00-03:00 UTC), every week.
+  await erin.getByLabel("Calendar file (.ics)").setInputFiles({
+    name: "timetable.ics",
+    mimeType: "text/calendar",
+    buffer: Buffer.from(
+      "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nSUMMARY:CSC1024 Lecture\r\nDTSTART:20260112T010000Z\r\nDTEND:20260112T030000Z\r\nRRULE:FREQ=WEEKLY;BYDAY=MO\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    ),
+  });
+  await erin.getByRole("button", { name: "Upload" }).click();
+  await expect(erin.getByText("Added 1 weekly slot.")).toBeVisible();
+  // And one by hand.
+  await erin.getByLabel("Day").selectOption("2");
+  await erin.getByLabel("Starts").fill("13:00");
+  await erin.getByLabel("Ends").fill("15:00");
+  await erin.getByLabel("Class", { exact: true }).fill("MTH1114 Tutorial");
+  await erin.getByRole("button", { name: "Add class" }).click();
+  await expect(erin.getByText("MTH1114 Tutorial", { exact: true })).toBeVisible();
+
+  await erin.goto("/study-groups");
+  await ready(erin);
+  await erin.getByLabel("Group name").fill("Recursion crew");
+  await erin.getByRole("button", { name: "Make group" }).click();
+  await erin.waitForURL(/\/study-groups\/[0-9a-f-]{36}$/);
+  const groupUrl = new URL(erin.url()).pathname;
+  await expect(erin.getByRole("heading", { name: "Recursion crew" })).toBeVisible();
+  const monday = erin.getByRole("region", { name: /^Monday/ });
+  await expect(monday.getByText("08:00–09:00, 11:00–22:00")).toBeVisible();
+  const invite = await erin.getByLabel("Invite link").inputValue();
+
+  const bob = await browser.newPage();
+  await signInMember(bob, BOB);
+  expect((await bob.goto(groupUrl))?.status()).toBe(404);
+  await bob.goto(new URL(invite).pathname);
+  await ready(bob);
+  await expect(bob.getByRole("heading", { name: "Recursion crew" })).toBeVisible();
+  await bob.getByRole("button", { name: "Join group" }).click();
+  await bob.waitForURL((u) => u.pathname === groupUrl);
+
+  // Bob plans a session on Sunday (never in the past); Erin marks herself as going and sees it on her schedule.
+  await bob.getByRole("region", { name: /^Sunday/ }).getByRole("link", { name: /Plan something/ }).click();
+  await bob.waitForURL(/plan=\d{4}-\d{2}-\d{2}/);
+  await ready(bob);
+  await bob.getByLabel("What", { exact: true }).fill("Library session");
+  await bob.getByLabel("Starts (optional)").fill("16:00");
+  await bob.getByRole("button", { name: "Add plan" }).click();
+  await expect(bob.getByText("Plan added.")).toBeVisible();
+  await expect(bob.getByText("MTH1114 Tutorial")).toHaveCount(0);
+
+  await erin.goto(groupUrl);
+  await ready(erin);
+  await erin.getByRole("button", { name: "I'm going to Library session" }).click();
+  await expect(erin.getByText("2 going")).toBeVisible();
+  const axe = await new AxeBuilder({ page: erin as never }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => v.id)).toEqual([]);
+  await erin.goto("/schedule");
+  await ready(erin);
+  await expect(erin.getByText("Library session")).toBeVisible();
+  await expect(erin.getByText("CSC1024 Lecture")).toBeVisible();
+  await Promise.all([erinContext.close(), bob.close()]);
+});
+
 test("bad words are blocked on the server and in the browser", async ({ page }) => {
   await signInMember(page, ALICE);
   await page.goto("/settings");
@@ -208,14 +276,31 @@ for (const colorScheme of ["light", "dark"] as const) test(`accessibility (${col
   };
   for (const p of ["/login", "/terms", "/privacy", "/guidelines", "/copyright", "/contact"]) await check(p);
   await signInMember(page, BOB);
-  for (const p of ["/", "/search", "/subjects", "/clubs", "/events", "/events?view=calendar", "/posts/new", "/settings", "/u/bob_t", "/notifications"]) {
+  for (const p of [
+    "/",
+    "/search",
+    "/subjects",
+    "/schedule",
+    "/schedule/timetable",
+    "/schedule/events",
+    "/study-groups",
+    "/leaderboard",
+    "/clubs",
+    "/events",
+    "/events?view=calendar",
+    "/posts/new",
+    "/settings",
+    "/u/bob_t",
+    "/notifications",
+  ]) {
     await check(p);
   }
   await context.close();
 });
 
 test("pop-up menu closes on an outside click and on Escape", async ({ page }) => {
-  await signInMember(page, BOB);
+  // A fresh member: Bob has used up his sign-in codes for the hour (5 per email).
+  await signInMember(page, "frank@imail.sunway.edu.my", "frank_m");
   const menu = page.locator("details[data-popup]");
   await page.getByLabel("Menu").click();
   await expect(menu).toHaveAttribute("open", "");

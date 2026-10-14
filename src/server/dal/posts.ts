@@ -285,7 +285,7 @@ function baseCardQuery() {
 }
 
 /** Only approved, not hidden, not deleted posts are visible to members in lists. */
-function publicCondition(): SQL {
+export function publicCondition(): SQL {
   return and(eq(posts.status, "approved"), eq(posts.hiddenByReports, false), isNull(posts.deletedAt)) as SQL;
 }
 

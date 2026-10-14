@@ -8,6 +8,8 @@ const NAV = [
   { href: "/subjects", label: "Subjects" },
   { href: "/clubs", label: "Clubs" },
   { href: "/events", label: "Events" },
+  { href: "/schedule", label: "Schedule" },
+  { href: "/study-groups", label: "Study groups" },
 ];
 
 export function SiteHeader({ actor, unread }: { actor: Actor | null; unread: number }) {
@@ -61,6 +63,11 @@ export function SiteHeader({ actor, unread }: { actor: Actor | null; unread: num
                     <li>
                       <Link href={`/u/${actor.username}`} className="block rounded px-3 py-2 text-ink hover:bg-surface">
                         My profile
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/leaderboard" className="block rounded px-3 py-2 text-ink hover:bg-surface">
+                        Leaderboard
                       </Link>
                     </li>
                     <li>
