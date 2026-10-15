@@ -10,7 +10,7 @@ SJ Study is a friendly place for Sunway students, teachers and staff to share st
 - Credit people who helped you, and get permission before sharing someone else's work.
 - Use clear titles and the right subject tag and semester so others can find your post.
 - Be kind. Everyone is learning.
-- Mark posts as "Helpful" when they help you.
+- Upvote posts and comments that help you, and downvote ones that are off topic. Don't vote just because you disagree.
 - Report content that breaks these guidelines. Reports are private.
 
 ## Don't

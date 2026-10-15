@@ -6,13 +6,13 @@ import { QueueShortcuts } from "@/components/admin/queue-shortcuts";
 import { PostLinks } from "@/components/posts/post-links";
 import { formatDateTime } from "@/lib/dates";
 import { formatBytes } from "@/lib/files";
+import { POST_TYPE_LABEL } from "@/lib/rules";
 import { bulkDecideAction, decideAvatarAction, decideLogoAction, decidePostAction } from "@/app/actions/admin";
 import { requireAdminPage } from "@/server/actor";
 import { pendingImages, pendingPosts } from "@/server/dal/admin";
 
 export const metadata: Metadata = { title: "Approval queue" };
 
-const TYPE_LABEL = { study: "Study Material", event: "Event", club: "Club Post" } as const;
 
 export default async function QueuePage() {
   const actor = await requireAdminPage();
@@ -44,7 +44,7 @@ export default async function QueuePage() {
                       aria-label={`Select "${p.title}" for bulk action`}
                       className="h-4 w-4"
                     />
-                    <span className="badge">{TYPE_LABEL[p.type]}</span>
+                    <span className="badge">{POST_TYPE_LABEL[p.type]}</span>
                     {p.clubName && <span>{p.clubName}</span>}
                     <span>{formatDateTime(p.createdAt)}</span>
                     <span>

@@ -14,7 +14,7 @@ export default async function LeaderboardPage() {
     <div className="mx-auto max-w-3xl">
       <PageTitle>Top contributors</PageTitle>
       <p className="mb-6 text-muted">
-        Ranked by how many times members marked their notes as helpful. Only members who choose to appear are listed.{" "}
+        Ranked by the upvotes minus downvotes on their posts. Anonymous posts are not counted. Only members who choose to appear are listed.{" "}
         {me.showOnLeaderboard ? "You're opted in." : "You're not listed."} <Link href="/settings">Change this in Settings</Link>.
       </p>
       {rows.length === 0 ? (
@@ -28,7 +28,7 @@ export default async function LeaderboardPage() {
                 {r.name ?? `@${r.username}`}
               </Link>
               <span className="text-sm text-muted tabular-nums">
-                {r.helpful} helpful · {r.posts} {r.posts === 1 ? "post" : "posts"}
+                {r.points} points · {r.posts} {r.posts === 1 ? "post" : "posts"}
               </span>
             </li>
           ))}

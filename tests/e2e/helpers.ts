@@ -37,7 +37,7 @@ export async function signInMember(page: Page, email: string, username?: string)
     await page.getByLabel(/I have read and accept/).check();
     await page.getByRole("button", { name: "Finish setup" }).click();
   }
-  await expect(page.getByRole("heading", { name: "Latest" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
 }
 
 export const ADMIN_EMAIL = "mohammedalqadhi745@gmail.com";

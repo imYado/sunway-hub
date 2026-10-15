@@ -123,7 +123,7 @@ export async function clubUpcomingEvents(actor: Actor, clubId: string) {
 export async function clubRecentPosts(actor: Actor, clubId: string): Promise<PostCard[]> {
   const [club] = await db.select({ slug: clubs.slug }).from(clubs).where(eq(clubs.id, clubId)).limit(1);
   if (!club) return [];
-  const r = await searchPosts(actor, { club: club.slug, sort: "newest" });
+  const r = await searchPosts(actor, { club: club.slug, sort: "new" });
   return r.items.slice(0, 10);
 }
 
@@ -503,4 +503,9 @@ export async function clubOptionsFor(actor: Actor) {
     .from(clubs)
     .where(and(...conds))
     .orderBy(asc(clubs.name));
+}
+
+/** Every club, for tagging a post with a club. Anyone can tag; only managers post as the club. */
+export async function allClubOptions() {
+  return db.select({ id: clubs.id, name: clubs.name }).from(clubs).where(isNull(clubs.deletedAt)).orderBy(asc(clubs.name));
 }

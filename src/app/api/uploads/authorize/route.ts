@@ -6,7 +6,12 @@ import { isSameOrigin } from "@/server/csrf";
 import { AppError } from "@/server/errors";
 import { authorizeUpload } from "@/server/dal/uploads";
 
-const payloadSchema = z.object({ name: z.string().min(1).max(200), size: z.number().int().positive(), contentType: z.string().max(200) });
+const payloadSchema = z.object({
+  name: z.string().min(1).max(200),
+  size: z.number().int().positive(),
+  contentType: z.string().max(200),
+  purpose: z.enum(["post", "comment"]).default("post"),
+});
 
 /**
  * Step 1 of a Vercel Blob CLIENT upload: the browser asks for a short-lived token.
@@ -28,7 +33,11 @@ export async function POST(req: NextRequest) {
       body,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         const payload = payloadSchema.parse(JSON.parse(clientPayload ?? "{}"));
-        const rules = await authorizeUpload(actor, { pathname, name: payload.name, contentType: payload.contentType, size: payload.size });
+        const rules = await authorizeUpload(
+          actor,
+          { pathname, name: payload.name, contentType: payload.contentType, size: payload.size },
+          payload.purpose,
+        );
         return {
           allowedContentTypes: rules.allowedContentTypes,
           maximumSizeInBytes: rules.maxBytes,

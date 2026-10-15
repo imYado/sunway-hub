@@ -9,7 +9,6 @@ import {
   clubManagerRequests,
   clubManagers,
   eventRsvps,
-  helpfulVotes,
   notificationSettings,
   notifications,
   posts,
@@ -20,6 +19,9 @@ import {
   userAvatars,
   userConsents,
   users,
+  commentVotes,
+  comments,
+  postVotes,
 } from "@/db/schema";
 import { BIO_MAX, DISPLAY_NAME_MAX, USERNAME_CHANGES_PER_WEEK, nextUsernameChange, usernameProblem } from "@/lib/rules";
 import type { Actor } from "../actor-types";
@@ -288,7 +290,9 @@ export async function exportMyData(actor: Actor) {
         }))
       : [],
     bookmarks: await db.select().from(bookmarks).where(eq(bookmarks.userId, actor.id)),
-    helpfulVotes: await db.select().from(helpfulVotes).where(eq(helpfulVotes.userId, actor.id)),
+    comments: await db.select().from(comments).where(eq(comments.authorId, actor.id)),
+    postVotes: await db.select().from(postVotes).where(eq(postVotes.userId, actor.id)),
+    commentVotes: await db.select().from(commentVotes).where(eq(commentVotes.userId, actor.id)),
     rsvps: await db.select().from(eventRsvps).where(eq(eventRsvps.userId, actor.id)),
     clubFollows: await db.select().from(clubFollows).where(eq(clubFollows.userId, actor.id)),
     subjectFollows: await db.select().from(subjectFollows).where(eq(subjectFollows.userId, actor.id)),
@@ -326,6 +330,14 @@ export async function eraseUser(userId: string, mode: "delete_posts" | "anonymis
         .update(posts)
         .set({ deletedAt: now, deletedBy: by?.id ?? userId, deleteReason: purgeNote })
         .where(and(eq(posts.authorId, userId), isNull(posts.deletedAt)));
+      await tx
+        .update(comments)
+        .set({ deletedAt: now, deletedBy: by?.id ?? userId, deleteReason: purgeNote })
+        .where(and(eq(comments.authorId, userId), isNull(comments.deletedAt)));
+      await tx
+        .update(storedFiles)
+        .set({ deletedAt: now })
+        .where(and(eq(storedFiles.ownerId, userId), eq(storedFiles.purpose, "comment_attachment"), isNull(storedFiles.deletedAt)));
     }
     await tx.delete(sessions).where(eq(sessions.userId, userId));
     await tx.delete(bookmarks).where(eq(bookmarks.userId, userId));

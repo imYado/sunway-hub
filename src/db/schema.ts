@@ -45,12 +45,12 @@ export const roleLabelEnum = pgEnum("role_label", ["student", "teacher", "other"
 export const userStatusEnum = pgEnum("user_status", ["active", "suspended", "banned", "deleted"]);
 export const otpPurposeEnum = pgEnum("otp_purpose", ["login", "admin_setup", "admin_reset", "delete_account"]);
 export const sessionStageEnum = pgEnum("session_stage", ["active", "needs_password", "needs_totp"]);
-export const postTypeEnum = pgEnum("post_type", ["study", "event", "club"]);
+export const postTypeEnum = pgEnum("post_type", ["study", "event", "club", "discussion"]);
 export const postStatusEnum = pgEnum("post_status", ["pending", "approved", "rejected", "changes_requested"]);
 export const fileKindEnum = pgEnum("file_kind", ["image", "pdf", "docx", "pptx", "video"]);
-export const storedFilePurposeEnum = pgEnum("stored_file_purpose", ["attachment", "avatar", "club_logo"]);
+export const storedFilePurposeEnum = pgEnum("stored_file_purpose", ["attachment", "avatar", "club_logo", "comment_attachment"]);
 export const imageReviewStatusEnum = pgEnum("image_review_status", ["pending", "approved", "rejected"]);
-export const reportTargetEnum = pgEnum("report_target", ["post", "user", "club", "study_group"]);
+export const reportTargetEnum = pgEnum("report_target", ["post", "user", "club", "study_group", "comment"]);
 export const reportReasonEnum = pgEnum("report_reason", [
   "copyright",
   "inappropriate",
@@ -204,6 +204,7 @@ export const storedFiles = pgTable(
     ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
     purpose: storedFilePurposeEnum("purpose").notNull(),
     postId: uuid("post_id").references(() => posts.id, { onDelete: "cascade" }),
+    commentId: uuid("comment_id").references(() => comments.id, { onDelete: "cascade" }),
     clubId: uuid("club_id"),
     storagePath: text("storage_path").notNull().unique(),
     originalName: text("original_name").notNull(),
@@ -224,6 +225,7 @@ export const storedFiles = pgTable(
   },
   (t) => [
     index("stored_files_post").on(t.postId),
+    index("stored_files_comment").on(t.commentId),
     index("stored_files_sha").on(t.sha256),
     index("stored_files_owner").on(t.ownerId, t.purpose),
   ],
@@ -378,7 +380,11 @@ export const posts = pgTable(
     decidedBy: uuid("decided_by"),
     titleEdited: boolean("title_edited").notNull().default(false),
     hiddenByReports: boolean("hidden_by_reports").notNull().default(false),
-    helpfulCount: integer("helpful_count").notNull().default(0),
+    // Upvotes minus downvotes, kept in step with post_votes.
+    score: integer("score").notNull().default(0),
+    commentCount: integer("comment_count").notNull().default(0),
+    // Set when the poster edits anything after submitting.
+    editedAt: ts("edited_at"),
     ownWorkConfirmedAt: ts("own_work_confirmed_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
@@ -456,8 +462,9 @@ export const eventRsvps = pgTable(
   (t) => [primaryKey({ columns: [t.postId, t.userId] })],
 );
 
-export const helpfulVotes = pgTable(
-  "helpful_votes",
+// One vote per member per post: +1 (up) or -1 (down).
+export const postVotes = pgTable(
+  "post_votes",
   {
     postId: uuid("post_id")
       .notNull()
@@ -465,9 +472,49 @@ export const helpfulVotes = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    value: smallint("value").notNull(),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
+// Threaded comments. They appear straight away (no approval), and can be reported like posts.
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id"),
+    body: text("body").notNull(),
+    score: integer("score").notNull().default(0),
+    hiddenByReports: boolean("hidden_by_reports").notNull().default(false),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    editedAt: ts("edited_at"),
+    deletedAt: ts("deleted_at"),
+    deletedBy: uuid("deleted_by"),
+    deleteReason: text("delete_reason"),
+  },
+  (t) => [index("comments_post").on(t.postId, t.createdAt), index("comments_author").on(t.authorId), index("comments_parent").on(t.parentId)],
+);
+
+export const commentVotes = pgTable(
+  "comment_votes",
+  {
+    commentId: uuid("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    value: smallint("value").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.commentId, t.userId] })],
 );
 
 export const bookmarks = pgTable(

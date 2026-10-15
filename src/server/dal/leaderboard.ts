@@ -4,11 +4,11 @@ import { db } from "@/db";
 import { posts, users } from "@/db/schema";
 import type { Actor } from "../actor-types";
 
-// Contributor leaderboard: opt-in, ranked by helpful votes on approved posts.
+// Contributor leaderboard: opt-in, ranked by the net votes (up minus down) on approved posts.
 export async function leaderboard(limit = 50) {
-  const helpful = sql<number>`coalesce(sum(${posts.helpfulCount}), 0)::int`;
+  const points = sql<number>`coalesce(sum(${posts.score}), 0)::int`;
   return db
-    .select({ userId: users.id, username: users.username, name: users.displayName, helpful, posts: sql<number>`count(${posts.id})::int` })
+    .select({ userId: users.id, username: users.username, name: users.displayName, points, posts: sql<number>`count(${posts.id})::int` })
     .from(users)
     .innerJoin(
       posts,
@@ -23,8 +23,8 @@ export async function leaderboard(limit = 50) {
     )
     .where(and(eq(users.showOnLeaderboard, true), eq(users.status, "active"), eq(users.hiddenByReports, false)))
     .groupBy(users.id)
-    .having(sql`sum(${posts.helpfulCount}) > 0`)
-    .orderBy(desc(helpful), asc(users.username))
+    .having(sql`sum(${posts.score}) > 0`)
+    .orderBy(desc(points), asc(users.username))
     .limit(limit);
 }
 

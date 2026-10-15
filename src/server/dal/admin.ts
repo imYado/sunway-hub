@@ -24,6 +24,7 @@ import { audit } from "../audit";
 import { hasRecentAuth, revokeAllSessions } from "../auth/session";
 import { AppError, NotFoundError, ReauthRequiredError } from "../errors";
 import { invalidateFilterCache } from "../profanity";
+import { deleteComment, describeComment } from "./comments";
 import { notify, notifyFollowersOfPost } from "./notifications";
 import { assertAdmin, assertNotAdminTarget } from "./policy";
 import { deleteGroup, describeGroup } from "./groups";
@@ -159,7 +160,7 @@ export async function decidePost(actor: Actor, postId: string, raw: z.input<type
         : `Note from the admin: ${reason}\n\nOnly the title can be edited. To change anything else, delete the post and submit it again.`;
   await notify([post.authorId], { kind: "decision", title: titles[status], body, link: `/posts/${post.id}` });
   if (status === "approved" && post.status !== "approved") {
-    await notifyFollowersOfPost({ id: post.id, authorId: post.authorId, title: post.title, clubId: post.clubId });
+    await notifyFollowersOfPost({ id: post.id, authorId: post.authorId, title: post.title, clubId: post.type === "club" ? post.clubId : null });
   }
 }
 
@@ -473,6 +474,12 @@ export async function openReports(actor: Actor) {
       g.link = p ? `/posts/${p.id}` : null;
       g.ownerId = p?.authorId ?? null;
       g.hidden = !!p?.hiddenByReports;
+    } else if (g.targetType === "comment") {
+      const c = await describeComment(g.targetId);
+      g.label = c ? `Comment: ${c.body.slice(0, 80) || "(attachment only)"}` : "Comment (removed)";
+      g.link = c ? `/posts/${c.postId}#comment-${c.id}` : null;
+      g.ownerId = c?.authorId ?? null;
+      g.hidden = !!c?.hidden;
     } else if (g.targetType === "user") {
       const [u] = await db.select().from(users).where(eq(users.id, g.targetId)).limit(1);
       g.label = u ? `Profile: @${u.username}` : "Profile (removed)";
@@ -508,6 +515,8 @@ export async function resolveReports(
     if (targetType === "post") {
       const { deletePost } = await import("./posts");
       await deletePost(actor, targetId, note);
+    } else if (targetType === "comment") {
+      await deleteComment(actor, targetId, note);
     } else if (targetType === "club") {
       const { adminDeleteClub } = await import("./clubs");
       await adminDeleteClub(actor, targetId, note);
@@ -522,6 +531,10 @@ export async function resolveReports(
       const [p] = await db.select({ authorId: posts.authorId }).from(posts).where(eq(posts.id, targetId)).limit(1);
       if (!p) throw new NotFoundError();
       userId = p.authorId;
+    } else if (targetType === "comment") {
+      const c = await describeComment(targetId);
+      if (!c) throw new NotFoundError();
+      userId = c.authorId;
     } else if (targetType === "club") {
       throw new AppError("Clubs cannot be warned or banned. Remove the club or dismiss the reports.");
     } else if (targetType !== "user") {

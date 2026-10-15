@@ -43,6 +43,20 @@
       "when": 1792051125501,
       "tag": "0005_post_links_and_anonymous",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792053401560,
+      "tag": "0006_votes_comments_and_discussions",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792053411108,
+      "tag": "0007_drop_helpful_votes",
+      "breakpoints": true
     }
   ]
 }

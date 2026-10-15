@@ -5,10 +5,10 @@ import { eq } from "drizzle-orm";
 import type { Actor } from "@/server/actor-types";
 import { decidePost } from "@/server/dal/admin";
 import { leaderboard } from "@/server/dal/leaderboard";
-import { createPost, getPostDetail, listProfilePosts, searchPosts, toggleHelpful } from "@/server/dal/posts";
+import { createPost, getPostDetail, listProfilePosts, searchPosts, votePost } from "@/server/dal/posts";
 import { PAST_PAPER_DIRECTORIES } from "@/content/past-papers";
 import { containsProfanity } from "@/lib/profanity/filter";
-import { DESCRIPTION_MAX, MAX_LINKS_PER_POST, MAX_SUBJECT_TAGS, TITLE_MAX, TITLE_MIN, cleanLinkUrl } from "@/lib/rules";
+import { DESCRIPTION_MAX, MAX_LINKS_PER_POST, MAX_TAGS, TITLE_MAX, TITLE_MIN, cleanLinkUrl } from "@/lib/rules";
 import { hasDb, makeUser, resetDb } from "./db-helpers";
 
 describe("cleanLinkUrl", () => {
@@ -32,7 +32,7 @@ describe("past paper directories", () => {
       expect(d.title.length).toBeGreaterThanOrEqual(TITLE_MIN);
       expect(d.title.length).toBeLessThanOrEqual(TITLE_MAX);
       expect(d.description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
-      expect(d.subjects.length).toBeLessThanOrEqual(MAX_SUBJECT_TAGS);
+      expect(d.subjects.length).toBeLessThanOrEqual(MAX_TAGS);
       expect(d.links.length).toBeLessThanOrEqual(MAX_LINKS_PER_POST);
       for (const l of d.links) expect(cleanLinkUrl(l.url)).toBe(l.url);
       expect(containsProfanity([d.title, d.description, ...d.subjects, ...d.links.map((l) => l.label)].join(" "))).toBe(false);
@@ -80,7 +80,7 @@ describe.skipIf(!hasDb)("link posts and anonymous posts", () => {
     await db.update(users).set({ teacherVerified: true, showOnLeaderboard: true }).where(eq(users.id, alice.id));
     const { id } = await createPost(alice, { type: "study", title: "Anonymous directory", subjects: ["Past Papers"], anonymous: true, ownWork: true });
     await decidePost(admin, id, { decision: "approve" });
-    await toggleHelpful(bob, id);
+    await votePost(bob, id, 1);
 
     const seenByBob = await getPostDetail(bob, id);
     expect(seenByBob.author).toMatchObject({ id: "", username: null, anonymous: true });

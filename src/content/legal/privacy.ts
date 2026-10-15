@@ -24,7 +24,7 @@ When you use SJ Study we collect:
 - Your name, username, bio, pronouns and role (student, teacher or other).
 - Your profile picture, if you upload one.
 - Content you upload: posts, descriptions, files, images and videos.
-- Your activity on the site: RSVPs, bookmarks, "Helpful" votes, club follows, reports you submit and messages you send us.
+- Your activity on the site: RSVPs, bookmarks, comments, upvotes and downvotes, club follows, reports you submit and messages you send us.
 - Your weekly class timetable, if you add one, and the study groups and plans you make or join. Calendar files you upload are read once and not kept.
 - Technical and security records: a hashed form of your IP address, your browser or device type, and timestamps of sign-ins and actions.
 

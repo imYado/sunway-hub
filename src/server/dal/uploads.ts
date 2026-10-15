@@ -8,10 +8,13 @@ import { klDayKey } from "@/lib/dates";
 import { env } from "@/lib/env";
 import {
   AVATAR_MAX_BYTES,
+  COMMENT_FILE_KINDS,
+  COMMENT_FILE_MAX_BYTES,
   FILE_RULES,
   MB,
   extensionOf,
   kindForMime,
+  precheckCommentFile,
   precheckFile,
   safeFileName,
   sniffFileType,
@@ -66,13 +69,18 @@ export interface UploadRequest {
  * upload route). Checks session (by requiring an Actor), path, type, size, the daily
  * quota, the per-user storage quota and the global storage cap.
  */
-export async function authorizeUpload(actor: Actor, req: UploadRequest): Promise<{ maxBytes: number; allowedContentTypes: string[] }> {
+export async function authorizeUpload(
+  actor: Actor,
+  req: UploadRequest,
+  purpose: "post" | "comment" = "post",
+): Promise<{ maxBytes: number; allowedContentTypes: string[] }> {
   await enforce("upload-auth", actor.id, LIMITS.uploadAuthPerUser.limit, LIMITS.uploadAuthPerUser.window);
   if (!req.pathname.startsWith(quarantinePrefixFor(actor.id)) || req.pathname.includes("..")) {
     throw new ForbiddenError("Invalid upload path.");
   }
   const settings = await getSettings();
-  const problem = precheckFile({ name: req.name, type: req.contentType, size: req.size }, settings.enabledFileKinds);
+  const file = { name: req.name, type: req.contentType, size: req.size };
+  const problem = purpose === "comment" ? precheckCommentFile(file, settings.enabledFileKinds) : precheckFile(file, settings.enabledFileKinds);
   if (problem) throw new AppError(problem);
   await assertClean(req.name.replace(/\.[a-z0-9]+$/i, ""));
 
@@ -94,7 +102,8 @@ export async function authorizeUpload(actor: Actor, req: UploadRequest): Promise
     throw new AppError(`You can upload up to ${settings.uploadsPerDay} files per day. Please try again tomorrow.`);
   }
   const kind = kindForMime(req.contentType) as FileKind;
-  return { maxBytes: FILE_RULES[kind].maxBytes, allowedContentTypes: FILE_RULES[kind].mime };
+  const maxBytes = purpose === "comment" ? Math.min(FILE_RULES[kind].maxBytes, COMMENT_FILE_MAX_BYTES) : FILE_RULES[kind].maxBytes;
+  return { maxBytes, allowedContentTypes: FILE_RULES[kind].mime };
 }
 
 export interface ProcessedFile {
@@ -187,8 +196,11 @@ export async function finaliseUploads(
   actor: Actor,
   postId: string,
   uploads: { pathname: string; name: string }[],
+  opts: { comment?: boolean; firstPosition?: number; folder?: string } = {},
 ): Promise<FinalisedFile[]> {
   const settings = await getSettings();
+  const kinds = opts.comment ? settings.enabledFileKinds.filter((k) => COMMENT_FILE_KINDS.includes(k)) : settings.enabledFileKinds;
+  const folder = opts.folder ?? `files/${postId}`;
   const store = storage();
   const written: string[] = [];
   const out: FinalisedFile[] = [];
@@ -201,8 +213,9 @@ export async function finaliseUploads(
       await assertClean(name.replace(/\.[a-z0-9]+$/i, ""));
       const bytes = await store.readAll(u.pathname, 50 * MB + 1);
       if (!bytes) throw new AppError(`"${name}" could not be found or is too large. Please upload it again.`);
-      const p = await processFileBytes(bytes, name, settings.enabledFileKinds);
-      const storagePath = `files/${postId}/${i}-${p.sha256.slice(0, 16)}.${p.ext}`;
+      if (opts.comment && bytes.length > COMMENT_FILE_MAX_BYTES) throw new AppError(`"${name}" is too large for a comment.`);
+      const p = await processFileBytes(bytes, name, kinds);
+      const storagePath = `${folder}/${i + (opts.firstPosition ?? 0)}-${p.sha256.slice(0, 16)}.${p.ext}`;
       await store.put(storagePath, p.data, p.mime);
       written.push(storagePath);
       out.push({

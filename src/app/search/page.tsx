@@ -4,7 +4,8 @@ import { Pagination, PostList } from "@/components/posts/post-card";
 import { POST_TYPES, semesterOptions } from "@/lib/rules";
 import { requireMember } from "@/server/actor";
 import { listClubs } from "@/server/dal/clubs";
-import { listSubjects, searchPosts, type SearchFilters } from "@/server/dal/posts";
+import { parseType } from "@/components/posts/feed-controls";
+import { listSubjects, parseSort, searchPosts, type SearchFilters } from "@/server/dal/posts";
 
 export const metadata: Metadata = { title: "Search" };
 
@@ -15,17 +16,18 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const filters: SearchFilters = {
     q: sp.q?.slice(0, 100),
-    type: sp.type === "study" || sp.type === "event" || sp.type === "club" ? sp.type : undefined,
+    type: parseType(sp.type),
     subject: sp.subject || undefined,
     semester: sp.semester || undefined,
     verifiedTeacher: sp.teacher === "1",
     club: sp.club || undefined,
-    sort: sp.sort === "helpful" ? "helpful" : "newest",
+    // With a search term and no sort chosen, results are ranked by relevance.
+    sort: sp.sort ? parseSort(sp.sort, "new") : sp.q ? undefined : "new",
     page: Number(sp.page ?? "1") || 1,
   };
   const [results, subjects, clubs] = await Promise.all([searchPosts(actor, filters), listSubjects(), listClubs(actor)]);
   const params = new URLSearchParams(Object.entries(sp).filter(([k, v]) => k !== "page" && v) as [string, string][]);
-  const hasQuery = Object.values(filters).some((v) => v && v !== "newest" && v !== 1);
+  const hasQuery = Object.entries(filters).some(([k, v]) => v && k !== "sort" && k !== "page");
 
   return (
     <div>
@@ -35,7 +37,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <label htmlFor="q" className="label">
             Search
           </label>
-          <input id="q" name="q" type="search" defaultValue={sp.q} className="input" placeholder="Titles, subjects, descriptions" />
+          <input id="q" name="q" type="search" defaultValue={sp.q} className="input" placeholder="Titles, tags, descriptions" />
         </div>
         <div>
           <label htmlFor="type" className="label">
@@ -52,7 +54,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         </div>
         <div>
           <label htmlFor="subject" className="label">
-            Subject
+            Tag
           </label>
           <select id="subject" name="subject" defaultValue={sp.subject ?? ""} className="input">
             <option value="">Any</option>
@@ -93,9 +95,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <label htmlFor="sort" className="label">
             Sort by
           </label>
-          <select id="sort" name="sort" defaultValue={sp.sort ?? "newest"} className="input">
-            <option value="newest">Newest</option>
-            <option value="helpful">Most helpful</option>
+          <select id="sort" name="sort" defaultValue={sp.sort ? parseSort(sp.sort, "new") : ""} className="input">
+            <option value="">{sp.q ? "Best match" : "New"}</option>
+            <option value="new">New</option>
+            <option value="hot">Hot</option>
+            <option value="top">Top</option>
           </select>
         </div>
         <label className="flex items-center gap-2 self-end pb-2 text-sm">

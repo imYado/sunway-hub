@@ -1,21 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Bookmark, CalendarPlus, Download, ThumbsUp } from "lucide-react";
+import { Bookmark, CalendarPlus, Download, Eye, EyeOff, Pencil } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
-import { CleanInput, CleanTextarea } from "@/components/ui/clean-input";
+import { CleanTextarea } from "@/components/ui/clean-input";
+import { CommentComposer } from "@/components/comments/comment-composer";
+import { CommentThread } from "@/components/comments/comment-thread";
+import { VoteControl } from "@/components/posts/vote-control";
 import { CopyLinkButton } from "@/components/ui/copy-link";
-import { AuthorName, StatusBadge } from "@/components/posts/post-card";
+import { AuthorName, PostTags, StatusBadge } from "@/components/posts/post-card";
 import { PostLinks } from "@/components/posts/post-links";
 import { ReportForm } from "@/components/report-form";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatBytes } from "@/lib/files";
-import { TITLE_MAX } from "@/lib/rules";
-import { bookmarkAction, deletePostAction, editTitleAction, helpfulAction, rsvpAction } from "@/app/actions/posts";
-import { revertTitleAction } from "@/app/actions/admin";
+import { POST_TYPE_LABEL } from "@/lib/rules";
+import { env } from "@/lib/env";
+import { bookmarkAction, deletePostAction, hidePostAction, rsvpAction } from "@/app/actions/posts";
 import { requireMember } from "@/server/actor";
 import { NotFoundError } from "@/server/errors";
+import { listComments } from "@/server/dal/comments";
 import { getPostDetail, type PostDetail } from "@/server/dal/posts";
+import { getSettings } from "@/server/settings";
 
 export const metadata: Metadata = { title: "Post" };
 
@@ -29,12 +34,13 @@ async function load(id: string): Promise<PostDetail> {
   }
 }
 
-const TYPE_LABEL = { study: "Study Material", event: "Event", club: "Club Post" } as const;
-
 export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const post = await load(id);
   const v = post.viewer;
+  const actor = await requireMember();
+  const [comments, settings] = await Promise.all([listComments(actor, post.id), getSettings()]);
+  const ctx = { postId: post.id, userId: actor.id, storageDriver: env.storageDriver, enabledKinds: settings.enabledFileKinds };
   const images = post.files.filter((f) => f.kind === "image");
   const others = post.files.filter((f) => f.kind !== "image");
 
@@ -49,7 +55,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <p className="mt-2">
             {post.status === "pending" && "Only you and the admin can see this post until it is approved."}
             {post.status === "rejected" && "This post was not approved."}
-            {post.status === "changes_requested" && "The admin asked for changes. Only the title can be edited; to change anything else, delete this post and submit it again."}
+            {post.status === "changes_requested" && "The admin asked for changes. Edit the post and save it to send it back for approval."}
           </p>
           {post.decisionReason && <p className="mt-2">Admin note: {post.decisionReason}</p>}
         </div>
@@ -59,22 +65,22 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       )}
 
       <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-        <span className="badge">{TYPE_LABEL[post.type]}</span>
-        {post.club && <Link href={`/clubs/${post.club.slug}`}>{post.club.name}</Link>}
+        <span className="badge">{POST_TYPE_LABEL[post.type]}</span>
       </div>
-      <h1 className="text-xl font-semibold">
-        {post.title}
-        {post.titleEdited && <span className="ml-2 text-sm font-normal text-muted">(edited)</span>}
-      </h1>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-        <AuthorName author={post.author} />
-        <span>{formatDate(post.createdAt)}</span>
-        {post.subjects.map((s) => (
-          <Link key={s.slug} href={`/subjects/${s.slug}`}>
-            {s.name}
-          </Link>
-        ))}
-        {post.semester && <span>{post.semester}</span>}
+      <div className="flex gap-3">
+        <VoteControl kind="post" id={post.id} postId={post.id} score={post.score} vote={post.viewerVote} canVote={v.canInteract && !v.isOwner} />
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-semibold break-words">{post.title}</h1>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+            <AuthorName author={post.author} />
+            <span>{formatDate(post.createdAt)}</span>
+            {post.editedAt && <span>(edited {formatDate(post.editedAt)})</span>}
+            {post.semester && <span>{post.semester}</span>}
+          </div>
+          <div className="mt-3">
+            <PostTags post={post} />
+          </div>
+        </div>
       </div>
 
       {post.event && (
@@ -152,50 +158,40 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         </ul>
       )}
 
-      {v.canInteract && (
-        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          {!v.isOwner && (
-            <ActionForm action={helpfulAction}>
-              <input type="hidden" name="postId" value={post.id} />
-              <SubmitButton variant={v.helpful ? "primary" : "default"} size="sm">
-                <ThumbsUp size={14} aria-hidden="true" /> Helpful ({post.helpfulCount})
-                {v.helpful && <span className="sr-only"> (you marked this helpful, select to remove)</span>}
-              </SubmitButton>
-            </ActionForm>
-          )}
-          {v.isOwner && <span className="text-sm text-muted">{post.helpfulCount} found this helpful</span>}
+      <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+        {v.canInteract && (
           <ActionForm action={bookmarkAction}>
             <input type="hidden" name="postId" value={post.id} />
             <SubmitButton variant={v.bookmarked ? "primary" : "default"} size="sm">
               <Bookmark size={14} aria-hidden="true" /> {v.bookmarked ? "Bookmarked" : "Bookmark"}
             </SubmitButton>
           </ActionForm>
-          <CopyLinkButton path={`/posts/${post.id}`} />
-        </div>
-      )}
-      {!v.isOwner && !post.deletedAt && <ReportForm targetType="post" targetId={post.id} />}
-
-      {v.canEditTitle && (
-        <section className="mt-8 border-t border-line pt-4">
-          <h2 className="text-lg font-semibold">Manage your post</h2>
-          <p className="mt-1 text-sm text-muted">
-            You can edit the title only. Description, tags, semester and files are locked after submission. To change them, delete this post and
-            submit it again.
-          </p>
-          <ActionForm action={editTitleAction} className="mt-3">
+        )}
+        {v.canInteract && <CopyLinkButton path={`/posts/${post.id}`} />}
+        {v.canEdit && (
+          <Link href={`/posts/${post.id}/edit`} className="btn btn-sm">
+            <Pencil size={14} aria-hidden="true" /> Edit
+          </Link>
+        )}
+        {v.isAdmin && !post.deletedAt && (
+          <ActionForm action={hidePostAction}>
             <input type="hidden" name="postId" value={post.id} />
-            <label htmlFor="edit-title" className="label">
-              Title
-            </label>
-            <CleanInput id="edit-title" name="title" defaultValue={post.title} minLength={5} maxLength={TITLE_MAX} required />
-            <div className="mt-2">
-              <SubmitButton variant="default" size="sm">
-                Save title
-              </SubmitButton>
-            </div>
+            <input type="hidden" name="hidden" value={post.hiddenByReports ? "0" : "1"} />
+            <SubmitButton variant="default" size="sm">
+              {post.hiddenByReports ? (
+                <>
+                  <Eye size={14} aria-hidden="true" /> Show post
+                </>
+              ) : (
+                <>
+                  <EyeOff size={14} aria-hidden="true" /> Hide post
+                </>
+              )}
+            </SubmitButton>
           </ActionForm>
-        </section>
-      )}
+        )}
+      </div>
+      {!v.isOwner && !post.deletedAt && <ReportForm targetType="post" targetId={post.id} />}
 
       {v.canDelete && (
         <section className="mt-6">
@@ -227,20 +223,23 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                   {formatDateTime(h.editedAt)}: &quot;{h.oldTitle}&quot; to &quot;{h.newTitle}&quot;
                   {h.revertedAt && <span className="text-muted"> (reverted)</span>}
                 </span>
-                {!h.revertedAt && (
-                  <ActionForm action={revertTitleAction}>
-                    <input type="hidden" name="historyId" value={h.id} />
-                    <input type="hidden" name="postId" value={post.id} />
-                    <SubmitButton variant="default" size="sm">
-                      Revert
-                    </SubmitButton>
-                  </ActionForm>
-                )}
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      <section id="comments" aria-labelledby="comments-title" className="mt-8 scroll-mt-20 border-t border-line pt-4">
+        <h2 id="comments-title" className="text-lg font-semibold">
+          Comments ({post.commentCount})
+        </h2>
+        {v.canInteract ? (
+          <CommentComposer ctx={ctx} />
+        ) : (
+          <p className="mt-2 text-sm text-muted">Comments open once the post is approved.</p>
+        )}
+        <CommentThread comments={comments} ctx={ctx} canComment={v.canInteract} isAdmin={v.isAdmin} />
+      </section>
     </article>
   );
 }
