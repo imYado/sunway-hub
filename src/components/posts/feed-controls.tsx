@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { POST_TYPES, type PostType } from "@/lib/rules";
 import type { PostSort } from "@/server/dal/posts";
+import { SortMenu } from "./sort-menu";
 
-const SORTS: { value: PostSort; label: string }[] = [
-  { value: "hot", label: "Hot" },
-  { value: "new", label: "New" },
-  { value: "top", label: "Top" },
+const SORTS: { value: PostSort; label: string; hint: string }[] = [
+  { value: "hot", label: "Hot", hint: "Popular right now" },
+  { value: "new", label: "New", hint: "Newest first" },
+  { value: "top", label: "Top", hint: "Most upvoted of all time" },
 ];
 
 const TYPE_FILTER_LABEL: Record<PostType, string> = { discussion: "Discussions", study: "Notes", event: "Events", club: "Clubs", market: "Market" };
@@ -50,13 +51,9 @@ export function FeedControls({
           ))}
         </nav>
       )}
-      <nav aria-label="Sort" className="ml-auto flex gap-2">
-        {SORTS.map((s) => (
-          <Link key={s.value} href={href(type, s.value)} className={`btn btn-sm ${sort === s.value ? "btn-primary" : ""}`} aria-current={sort === s.value ? "page" : undefined}>
-            {s.label}
-          </Link>
-        ))}
-      </nav>
+      <div className="ml-auto">
+        <SortMenu current={sort} options={SORTS.map((s) => ({ ...s, href: href(type, s.value) }))} />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/layout/page-skeleton";
+import { PageSearch } from "@/components/ui/page-search";
 import { EmptyState, PageTitle } from "@/components/ui/empty";
 import { FeedControls, parseType } from "@/components/posts/feed-controls";
 import { HOME_POST_TYPES } from "@/lib/rules";
@@ -8,7 +9,7 @@ import { Pagination, PostList } from "@/components/posts/post-card";
 import { requireMember } from "@/server/actor";
 import { listFeed, parseSort } from "@/server/dal/posts";
 
-type SP = { page?: string; type?: string; sort?: string };
+type SP = { page?: string; type?: string; sort?: string; q?: string };
 
 export default function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
@@ -25,8 +26,9 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
   const parsed = parseType(sp.type);
   const type = parsed === "market" ? undefined : parsed;
   const sort = parseSort(sp.sort, "hot");
-  const feed = await listFeed(actor, { page, type, sort });
-  const params = new URLSearchParams(Object.entries({ type, sort }).filter(([, v]) => v) as [string, string][]);
+  const q = sp.q?.trim().slice(0, 100) || undefined;
+  const feed = await listFeed(actor, { page, type, sort, q });
+  const params = new URLSearchParams(Object.entries({ type, sort, q }).filter(([, v]) => v) as [string, string][]);
   return (
     <div>
       <PageTitle
@@ -38,14 +40,19 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
       >
         Home
       </PageTitle>
-      <FeedControls base="/" type={type} sort={sort} types={HOME_POST_TYPES} />
+      <PageSearch action="/" label="Search posts" placeholder="Search posts" defaultValue={q} keep={{ type, sort: sp.sort }} />
+      <FeedControls base="/" type={type} sort={sort} types={HOME_POST_TYPES} extra={{ q }} />
       <PostList
         posts={feed.items}
         path="/"
         empty={
-          <EmptyState title="Nothing here yet">
-            Be the first to <Link href="/posts/new">post something</Link>.
-          </EmptyState>
+          q ? (
+            <EmptyState title="No posts found">Try other words, or search everything from Search.</EmptyState>
+          ) : (
+            <EmptyState title="Nothing here yet">
+              Be the first to <Link href="/posts/new">post something</Link>.
+            </EmptyState>
+          )
         }
       />
       <Pagination page={feed.page} pages={feed.pages} makeHref={(p) => `/?${params.toString()}&page=${p}`} />

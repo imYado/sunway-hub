@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/layout/page-skeleton";
+import { PageSearch } from "@/components/ui/page-search";
 import { EmptyState, PageTitle } from "@/components/ui/empty";
 import { FeedControls } from "@/components/posts/feed-controls";
 import { Pagination, PostList } from "@/components/posts/post-card";
@@ -11,7 +12,7 @@ import { listMarket, parseSort } from "@/server/dal/posts";
 
 export const metadata: Metadata = { title: "Market" };
 
-type SP = { page?: string; kind?: string; sort?: string };
+type SP = { page?: string; kind?: string; sort?: string; q?: string };
 
 export default function MarketPage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
@@ -27,12 +28,13 @@ async function Market({ searchParams }: { searchParams: Promise<SP> }) {
   const page = Number(sp.page ?? "1") || 1;
   const kind = MARKET_KINDS.some((k) => k.value === sp.kind) ? (sp.kind as MarketKind) : undefined;
   const sort = parseSort(sp.sort, "new");
-  const feed = await listMarket(actor, { page, kind, sort });
+  const q = sp.q?.trim().slice(0, 100) || undefined;
+  const feed = await listMarket(actor, { page, kind, sort, q });
   const href = (k: MarketKind | undefined) => {
-    const p = new URLSearchParams(Object.entries({ kind: k, sort }).filter(([, v]) => v) as [string, string][]);
+    const p = new URLSearchParams(Object.entries({ kind: k, sort, q }).filter(([, v]) => v) as [string, string][]);
     return p.size ? `/market?${p}` : "/market";
   };
-  const params = new URLSearchParams(Object.entries({ kind, sort }).filter(([, v]) => v) as [string, string][]);
+  const params = new URLSearchParams(Object.entries({ kind, sort, q }).filter(([, v]) => v) as [string, string][]);
   return (
     <div>
       <PageTitle
@@ -45,6 +47,7 @@ async function Market({ searchParams }: { searchParams: Promise<SP> }) {
         Market
       </PageTitle>
       <p className="mb-4 text-muted">Buy, sell, swap or borrow things with other members. Message the poster to arrange the details.</p>
+      <PageSearch action="/market" label="Search the market" placeholder="Search the market" defaultValue={q} keep={{ kind, sort: sp.sort }} />
       <nav aria-label="Listing type" className="mb-2 flex flex-wrap gap-2">
         <Link href={href(undefined)} className={`btn btn-sm ${!kind ? "btn-primary" : ""}`} aria-current={!kind ? "page" : undefined}>
           All
@@ -55,14 +58,18 @@ async function Market({ searchParams }: { searchParams: Promise<SP> }) {
           </Link>
         ))}
       </nav>
-      <FeedControls base="/market" sort={sort} extra={{ kind }} showTypes={false} />
+      <FeedControls base="/market" sort={sort} extra={{ kind, q }} showTypes={false} />
       <PostList
         posts={feed.items}
         path="/market"
         empty={
-          <EmptyState title="No listings yet">
-            <Link href="/posts/new?type=market">Post the first one</Link>.
-          </EmptyState>
+          q ? (
+            <EmptyState title="No listings found">Try other words.</EmptyState>
+          ) : (
+            <EmptyState title="No listings yet">
+              <Link href="/posts/new?type=market">Post the first one</Link>.
+            </EmptyState>
+          )
         }
       />
       <Pagination page={feed.page} pages={feed.pages} makeHref={(p) => `/market?${params.toString()}&page=${p}`} />

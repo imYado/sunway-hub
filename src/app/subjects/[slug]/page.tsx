@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { EmptyState, PageTitle } from "@/components/ui/empty";
 import { FeedControls, parseType } from "@/components/posts/feed-controls";
+import { PageSearch } from "@/components/ui/page-search";
 import { Pagination, PostList } from "@/components/posts/post-card";
 import { followSubjectAction } from "@/app/actions/posts";
 import { requireMember } from "@/server/actor";
@@ -17,7 +18,7 @@ export default async function SubjectPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ semester?: string; sort?: string; type?: string; page?: string }>;
+  searchParams: Promise<{ semester?: string; sort?: string; type?: string; page?: string; q?: string }>;
 }) {
   const actor = await requireMember({ guestOk: true });
   const { slug } = await params;
@@ -26,12 +27,13 @@ export default async function SubjectPage({
   if (!subject) notFound();
   const sort = parseSort(sp.sort, "hot");
   const type = parseType(sp.type);
+  const q = sp.q?.trim().slice(0, 100) || undefined;
   const [semesters, following, results] = await Promise.all([
     semestersForSubject(subject.id),
     isFollowingSubject(actor, subject.id),
-    searchPosts(actor, { subject: slug, semester: sp.semester, type, sort, page: Number(sp.page ?? 1) || 1 }),
+    searchPosts(actor, { subject: slug, semester: sp.semester, type, sort, q, page: Number(sp.page ?? 1) || 1 }),
   ]);
-  const base = `/subjects/${slug}?${new URLSearchParams(Object.entries({ semester: sp.semester, type, sort }).filter(([, v]) => v) as [string, string][]).toString()}&`;
+  const base = `/subjects/${slug}?${new URLSearchParams(Object.entries({ semester: sp.semester, type, sort, q }).filter(([, v]) => v) as [string, string][]).toString()}&`;
   return (
     <div>
       <PageTitle
@@ -47,7 +49,8 @@ export default async function SubjectPage({
       >
         #{subject.name}
       </PageTitle>
-      <FeedControls base={`/subjects/${slug}`} type={type} sort={sort} extra={{ semester: sp.semester }} />
+      <PageSearch action={`/subjects/${slug}`} label={`Search #${subject.name}`} placeholder={`Search #${subject.name}`} defaultValue={q} keep={{ semester: sp.semester, type, sort: sp.sort }} />
+      <FeedControls base={`/subjects/${slug}`} type={type} sort={sort} extra={{ semester: sp.semester, q }} />
       <nav aria-label="Semesters" className="mb-4 flex flex-wrap gap-2">
         <Link href={`/subjects/${slug}`} className={`btn btn-sm ${!sp.semester ? "btn-primary" : ""}`} aria-current={!sp.semester ? "page" : undefined}>
           All semesters

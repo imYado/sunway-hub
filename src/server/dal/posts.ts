@@ -447,13 +447,13 @@ export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ ite
 }
 
 /** The home page: every kind of post except Market listings, which have their own page. */
-export async function listFeed(actor: Actor, opts: { page?: number; type?: PostType; sort?: PostSort } = {}) {
+export async function listFeed(actor: Actor, opts: { page?: number; type?: PostType; sort?: PostSort; q?: string } = {}) {
   const type = opts.type === "market" ? undefined : opts.type;
-  return searchPosts(actor, { page: opts.page ?? 1, type, excludeTypes: ["market"], sort: opts.sort ?? "hot" });
+  return searchPosts(actor, { page: opts.page ?? 1, type, excludeTypes: ["market"], sort: opts.sort ?? "hot", q: opts.q || undefined });
 }
 
-export async function listMarket(actor: Actor, opts: { page?: number; kind?: MarketKind; sort?: PostSort } = {}) {
-  return searchPosts(actor, { page: opts.page ?? 1, type: "market", marketKind: opts.kind, sort: opts.sort ?? "new" });
+export async function listMarket(actor: Actor, opts: { page?: number; kind?: MarketKind; sort?: PostSort; q?: string } = {}) {
+  return searchPosts(actor, { page: opts.page ?? 1, type: "market", marketKind: opts.kind, sort: opts.sort ?? "new", q: opts.q || undefined });
 }
 
 export type ProfileTab = "posts" | "pending" | "rejected" | "bookmarks";
