@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { CalendarDays, FileText, Link2, ThumbsUp } from "lucide-react";
+import { CalendarDays, FileText, Link2, MessageSquare } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/dates";
+import { POST_TYPE_LABEL } from "@/lib/rules";
 import type { PostCard as PostCardData } from "@/server/dal/posts";
-
-const TYPE_LABEL = { study: "Study Material", event: "Event", club: "Club Post" } as const;
+import { VoteControl } from "./vote-control";
 
 export function StatusBadge({ status }: { status: PostCardData["status"] }) {
   if (status === "approved") return null;
@@ -24,73 +24,92 @@ export function AuthorName({ author }: { author: PostCardData["author"] }) {
   );
 }
 
-export function PostCard({ post, showStatus = false }: { post: PostCardData; showStatus?: boolean }) {
+/** Tags on a post: its subject tags, plus its club as a tag. */
+export function PostTags({ post }: { post: Pick<PostCardData, "subjects" | "club"> }) {
+  if (post.subjects.length === 0 && !post.club) return null;
   return (
-    <article className="card p-4">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-        <span className="badge">{TYPE_LABEL[post.type]}</span>
-        {post.club && (
-          <Link href={`/clubs/${post.club.slug}`} className="text-sm">
+    <ul className="flex flex-wrap gap-2" aria-label="Tags">
+      {post.club && (
+        <li>
+          <Link href={`/clubs/${post.club.slug}`} className="badge">
             {post.club.name}
           </Link>
-        )}
-        {showStatus && <StatusBadge status={post.status} />}
-        {post.hiddenByReports && <span className="badge text-danger">Hidden while under review</span>}
-      </div>
-      <h2 className="text-lg font-semibold">
-        <Link href={`/posts/${post.id}`} className="text-ink">
-          {post.title}
-        </Link>
-        {post.titleEdited && <span className="ml-2 text-sm font-normal text-muted">(edited)</span>}
-      </h2>
-      {post.event && (
-        <p className="mt-1 flex items-center gap-2 text-sm">
-          <CalendarDays size={16} aria-hidden="true" />
-          {formatDateTime(post.event.startsAt)} · {post.event.location}
-        </p>
+        </li>
       )}
-      {post.description && <p className="mt-2 line-clamp-3 text-sm text-muted">{post.description}</p>}
-      {showStatus && post.decisionReason && post.status !== "approved" && (
-        <p className="mt-2 text-sm text-danger">Admin note: {post.decisionReason}</p>
-      )}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
-        <AuthorName author={post.author} />
-        <span>{formatDate(post.createdAt)}</span>
-        {post.subjects.map((s) => (
-          <Link key={s.slug} href={`/subjects/${s.slug}`} className="text-sm">
-            {s.name}
+      {post.subjects.map((s) => (
+        <li key={s.slug}>
+          <Link href={`/subjects/${s.slug}`} className="badge">
+            #{s.name}
           </Link>
-        ))}
-        {post.semester && <span>{post.semester}</span>}
-        {post.fileCount > 0 && (
-          <span className="flex items-center gap-1">
-            <FileText size={14} aria-hidden="true" />
-            {post.fileCount} file{post.fileCount === 1 ? "" : "s"}
-          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function PostCard({ post, showStatus = false, path }: { post: PostCardData; showStatus?: boolean; path?: string }) {
+  const votable = post.status === "approved" && !post.hiddenByReports && !post.deletedAt;
+  return (
+    <article className="card flex gap-3 p-4">
+      <VoteControl kind="post" id={post.id} postId={post.id} score={post.score} vote={post.viewerVote} canVote={votable && !post.viewerIsAuthor} path={path} />
+      <div className="min-w-0 flex-1">
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span className="badge">{POST_TYPE_LABEL[post.type]}</span>
+          {showStatus && <StatusBadge status={post.status} />}
+          {post.hiddenByReports && <span className="badge text-danger">Hidden while under review</span>}
+          <AuthorName author={post.author} />
+          <span>{formatDate(post.createdAt)}</span>
+          {post.editedAt && <span>(edited)</span>}
+        </div>
+        <h2 className="text-lg font-semibold break-words">
+          <Link href={`/posts/${post.id}`} className="text-ink">
+            {post.title}
+          </Link>
+        </h2>
+        {post.event && (
+          <p className="mt-1 flex items-center gap-2 text-sm">
+            <CalendarDays size={16} aria-hidden="true" />
+            {formatDateTime(post.event.startsAt)} · {post.event.location}
+          </p>
         )}
-        {post.links.length > 0 && (
-          <span className="flex items-center gap-1">
-            <Link2 size={14} aria-hidden="true" />
-            {post.links.length} link{post.links.length === 1 ? "" : "s"}
-          </span>
+        {post.description && <p className="mt-2 line-clamp-3 text-sm text-muted break-words">{post.description}</p>}
+        {showStatus && post.decisionReason && post.status !== "approved" && (
+          <p className="mt-2 text-sm text-danger">Admin note: {post.decisionReason}</p>
         )}
-        <span className="flex items-center gap-1">
-          <ThumbsUp size={14} aria-hidden="true" />
-          {post.helpfulCount}
-          <span className="sr-only">helpful votes</span>
-        </span>
+        <div className="mt-3">
+          <PostTags post={post} />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
+          <Link href={`/posts/${post.id}#comments`} className="flex items-center gap-1 text-muted">
+            <MessageSquare size={14} aria-hidden="true" />
+            {post.commentCount} comment{post.commentCount === 1 ? "" : "s"}
+          </Link>
+          {post.semester && <span>{post.semester}</span>}
+          {post.fileCount > 0 && (
+            <span className="flex items-center gap-1">
+              <FileText size={14} aria-hidden="true" />
+              {post.fileCount} file{post.fileCount === 1 ? "" : "s"}
+            </span>
+          )}
+          {post.links.length > 0 && (
+            <span className="flex items-center gap-1">
+              <Link2 size={14} aria-hidden="true" />
+              {post.links.length} link{post.links.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
       </div>
     </article>
   );
 }
 
-export function PostList({ posts, showStatus = false, empty }: { posts: PostCardData[]; showStatus?: boolean; empty: React.ReactNode }) {
+export function PostList({ posts, showStatus = false, empty, path }: { posts: PostCardData[]; showStatus?: boolean; empty: React.ReactNode; path?: string }) {
   if (posts.length === 0) return <>{empty}</>;
   return (
     <ul className="space-y-4">
       {posts.map((p) => (
         <li key={p.id}>
-          <PostCard post={p} showStatus={showStatus} />
+          <PostCard post={p} showStatus={showStatus} path={path} />
         </li>
       ))}
     </ul>

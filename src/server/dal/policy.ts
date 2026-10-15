@@ -30,8 +30,11 @@ export function assertCanViewPost(actor: Actor, post: PostLike | null | undefine
   if (!post || !canViewPost(actor, post)) throw new NotFoundError();
 }
 
-/** Posters may edit the TITLE ONLY. Nobody may edit description, tags, semester or files after submission. */
-export function canEditTitle(actor: Actor, post: PostLike): boolean {
+/**
+ * Only the poster may edit their post (title, text, tags, links and files). The admin
+ * can hide or delete other people's posts but never change what they wrote.
+ */
+export function canEditPost(actor: Actor, post: PostLike): boolean {
   return !post.deletedAt && post.authorId === actor.id;
 }
 

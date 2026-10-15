@@ -6,10 +6,11 @@ import { db } from "@/db";
 import {
   bookmarks,
   clubs,
+  comments,
   eventRsvps,
   events,
-  helpfulVotes,
   postSubjects,
+  postVotes,
   postTitleHistory,
   posts,
   type PostLink,
@@ -19,11 +20,12 @@ import {
 } from "@/db/schema";
 import { parseKlInput } from "@/lib/dates";
 import { MAX_FILES_PER_POST } from "@/lib/files";
+import type { PostType } from "@/lib/rules";
 import {
   DESCRIPTION_MAX,
   LINK_LABEL_MAX,
   MAX_LINKS_PER_POST,
-  MAX_SUBJECT_TAGS,
+  MAX_TAGS,
   SEMESTER_RE,
   cleanLinkUrl,
   slugify,
@@ -37,8 +39,10 @@ import { enforce, LIMITS } from "../rate-limit";
 import { getSettings } from "../settings";
 import { storage } from "../storage";
 import { notify, notifyFollowersOfPost } from "./notifications";
-import { assertCanViewPost, canDeletePost, canEditTitle, canInteract, canViewPost, managesClub } from "./policy";
+import { assertCanViewPost, canDeletePost, canEditPost, canInteract, canViewPost, managesClub } from "./policy";
 import { finaliseUploads } from "./uploads";
+
+export type VoteValue = 1 | -1;
 
 export const PAGE_SIZE = 20;
 export const PURGE_AFTER_DAYS = 30;
@@ -83,10 +87,10 @@ export async function suggestSubjects(q: string, limit = 8) {
 // ---------------------------------------------------------------------------
 export const createPostSchema = z
   .object({
-    type: z.enum(["study", "event", "club"]),
+    type: z.enum(["discussion", "study", "event", "club"]),
     title: titleSchema,
     description: z.string().trim().max(DESCRIPTION_MAX, `Descriptions can be at most ${DESCRIPTION_MAX} characters.`).default(""),
-    subjects: z.array(z.string().trim().min(1).max(80)).max(MAX_SUBJECT_TAGS).default([]),
+    subjects: z.array(z.string().trim().min(1).max(80)).max(MAX_TAGS).default([]),
     semester: z
       .string()
       .trim()
@@ -129,25 +133,28 @@ export const createPostSchema = z
       ctx.addIssue({ code: "custom", message: "Club posts can't be anonymous.", path: ["anonymous"] });
     }
     if (v.type === "study" && v.subjects.length === 0) {
-      ctx.addIssue({ code: "custom", message: "Add at least one subject tag.", path: ["subjects"] });
+      ctx.addIssue({ code: "custom", message: "Add at least one tag, like the course code.", path: ["subjects"] });
     }
   });
 
 export type CreatePostInput = z.input<typeof createPostSchema>;
 
-export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ id: string; status: string }> {
-  const input = createPostSchema.parse(raw);
-  await enforce("write", actor.id, LIMITS.writePerUser.limit, LIMITS.writePerUser.window);
+type ParsedPost = z.output<typeof createPostSchema>;
+type EventData = { startsAt: Date; endsAt: Date | null; location: string; capacity: number | null };
+
+/** Checks shared by creating and editing a post. Returns the cleaned links and event details. */
+async function checkPostContent(actor: Actor, input: ParsedPost): Promise<{ links: PostLink[]; eventData: EventData | null }> {
   const links: PostLink[] = input.links.map((l) => ({ url: l.url, label: l.label || new URL(l.url).hostname.replace(/^www\./, "") }));
   await assertClean(input.title, input.description, ...input.subjects, input.event?.location, ...links.map((l) => l.label));
 
   if (input.clubId) {
     const [club] = await db.select({ id: clubs.id }).from(clubs).where(and(eq(clubs.id, input.clubId), isNull(clubs.deletedAt))).limit(1);
     if (!club) throw new AppError("That club does not exist.");
-    if (!managesClub(actor, input.clubId)) throw new ForbiddenError("Only this club's managers can post for the club.");
+    // Anyone can tag a club; only its managers can post as the club.
+    if (input.type === "club" && !managesClub(actor, input.clubId)) throw new ForbiddenError("Only this club's managers can post for the club.");
   }
 
-  let eventData: { startsAt: Date; endsAt: Date | null; location: string; capacity: number | null } | null = null;
+  let eventData: EventData | null = null;
   if (input.type === "event" && input.event) {
     const startsAt = parseKlInput(input.event.startsAt);
     const endsAt = input.event.endsAt ? parseKlInput(input.event.endsAt) : null;
@@ -156,6 +163,13 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
     if (endsAt && endsAt <= startsAt) throw new AppError("The event must end after it starts.");
     eventData = { startsAt, endsAt, location: input.event.location, capacity: input.event.capacity ?? null };
   }
+  return { links, eventData };
+}
+
+export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ id: string; status: string }> {
+  const input = createPostSchema.parse(raw);
+  await enforce("write", actor.id, LIMITS.writePerUser.limit, LIMITS.writePerUser.window);
+  const { links, eventData } = await checkPostContent(actor, input);
 
   const subjectRows = await upsertSubjects(input.subjects);
   const postId = randomUUID();
@@ -203,7 +217,7 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
     throw err;
   }
   if (autoApproved) {
-    await notifyFollowersOfPost({ id: postId, authorId: actor.id, title: input.title, clubId: input.clubId ?? null });
+    await notifyFollowersOfPost({ id: postId, authorId: actor.id, title: input.title, clubId: input.type === "club" ? (input.clubId ?? null) : null });
   }
   return { id: postId, status: autoApproved ? "approved" : "pending" };
 }
@@ -213,13 +227,18 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
 // ---------------------------------------------------------------------------
 export interface PostCard {
   id: string;
-  type: "study" | "event" | "club";
+  type: PostType;
   title: string;
   description: string;
   semester: string | null;
   status: PostRow["status"];
   titleEdited: boolean;
-  helpfulCount: number;
+  editedAt: Date | null;
+  score: number;
+  commentCount: number;
+  /** The viewer's own vote on this post. */
+  viewerVote: VoteValue | null;
+  viewerIsAuthor: boolean;
   createdAt: Date;
   hiddenByReports: boolean;
   deletedAt: Date | null;
@@ -241,7 +260,9 @@ const cardSelect = {
   semester: posts.semester,
   status: posts.status,
   titleEdited: posts.titleEdited,
-  helpfulCount: posts.helpfulCount,
+  editedAt: posts.editedAt,
+  score: posts.score,
+  commentCount: posts.commentCount,
   createdAt: posts.createdAt,
   hiddenByReports: posts.hiddenByReports,
   deletedAt: posts.deletedAt,
@@ -277,6 +298,10 @@ async function hydrateCards(actor: Actor, rows: CardRow[]): Promise<PostCard[]> 
     .from(storedFiles)
     .where(and(inArray(storedFiles.postId, ids), isNull(storedFiles.deletedAt)))
     .groupBy(storedFiles.postId);
+  const votes = await db
+    .select({ postId: postVotes.postId, value: postVotes.value })
+    .from(postVotes)
+    .where(and(inArray(postVotes.postId, ids), eq(postVotes.userId, actor.id)));
   return rows.map((r) => {
     const deleted = r.authorStatus === "deleted";
     const anonymous = r.anonymous as boolean;
@@ -289,7 +314,11 @@ async function hydrateCards(actor: Actor, rows: CardRow[]): Promise<PostCard[]> 
       semester: r.semester as string | null,
       status: r.status as PostRow["status"],
       titleEdited: r.titleEdited as boolean,
-      helpfulCount: r.helpfulCount as number,
+      editedAt: r.editedAt as Date | null,
+      score: r.score as number,
+      commentCount: r.commentCount as number,
+      viewerVote: (votes.find((v) => v.postId === r.id)?.value as VoteValue | undefined) ?? null,
+      viewerIsAuthor: r.authorId === actor.id,
       createdAt: r.createdAt as Date,
       hiddenByReports: r.hiddenByReports as boolean,
       deletedAt: r.deletedAt as Date | null,
@@ -329,14 +358,27 @@ export function publicCondition(): SQL {
   return and(eq(posts.status, "approved"), eq(posts.hiddenByReports, false), isNull(posts.deletedAt)) as SQL;
 }
 
+export type PostSort = "hot" | "new" | "top";
+
+/** Reads a sort from a URL. Old links used "newest" and "helpful". */
+export function parseSort(raw: string | undefined, fallback: PostSort): PostSort {
+  if (raw === "new" || raw === "newest") return "new";
+  if (raw === "top" || raw === "helpful") return "top";
+  if (raw === "hot") return "hot";
+  return fallback;
+}
+
+// Reddit-style "hot": score counts on a log scale, and newer posts get a steady boost.
+const hotRank = sql`(sign(${posts.score}) * log(greatest(abs(${posts.score}), 1)) + extract(epoch from ${posts.createdAt}) / 45000)`;
+
 export interface SearchFilters {
   q?: string;
-  type?: "study" | "event" | "club";
-  subject?: string; // subject slug
+  type?: PostType;
+  subject?: string; // tag (subject) slug
   semester?: string;
   verifiedTeacher?: boolean;
   club?: string; // club slug
-  sort?: "newest" | "helpful";
+  sort?: PostSort;
   page?: number;
 }
 
@@ -360,11 +402,13 @@ export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ ite
   }
   const where = and(...conds);
   const order =
-    f.sort === "helpful"
-      ? [desc(posts.helpfulCount), desc(posts.createdAt)]
-      : q
-        ? [desc(sql`ts_rank(${posts.search}, websearch_to_tsquery('english', ${q}))`), desc(posts.createdAt)]
-        : [desc(posts.createdAt)];
+    f.sort === "top"
+      ? [desc(posts.score), desc(posts.createdAt)]
+      : f.sort === "hot"
+        ? [desc(hotRank), desc(posts.createdAt)]
+        : q && !f.sort
+          ? [desc(sql`ts_rank(${posts.search}, websearch_to_tsquery('english', ${q}))`), desc(posts.createdAt)]
+          : [desc(posts.createdAt)];
   const [totalRow] = await db
     .select({ n: count() })
     .from(posts)
@@ -380,8 +424,8 @@ export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ ite
   return { items: await hydrateCards(actor, rows), total, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
-export async function listFeed(actor: Actor, page = 1) {
-  return searchPosts(actor, { page, sort: "newest" });
+export async function listFeed(actor: Actor, opts: { page?: number; type?: PostType; sort?: PostSort } = {}) {
+  return searchPosts(actor, { page: opts.page ?? 1, type: opts.type, sort: opts.sort ?? "hot" });
 }
 
 export type ProfileTab = "posts" | "pending" | "rejected" | "bookmarks";
@@ -415,16 +459,16 @@ export async function listProfilePosts(actor: Actor, userId: string, tab: Profil
 export interface PostDetail extends PostCard {
   authorId: string;
   clubId: string | null;
+  anonymous: boolean;
   decisionReason: string | null;
   files: { id: string; name: string; kind: string; contentType: string; size: number; width: number | null; height: number | null }[];
   event: { startsAt: Date; endsAt: Date | null; location: string; capacity: number | null; going: number; interested: number } | null;
   viewer: {
     isOwner: boolean;
     isAdmin: boolean;
-    helpful: boolean;
     bookmarked: boolean;
     rsvp: "going" | "interested" | null;
-    canEditTitle: boolean;
+    canEdit: boolean;
     canDelete: boolean;
     canInteract: boolean;
   };
@@ -454,11 +498,6 @@ export async function getPostDetail(actor: Actor, postId: string): Promise<PostD
     going = Number(counts.find((c) => c.status === "going")?.n ?? 0);
     interested = Number(counts.find((c) => c.status === "interested")?.n ?? 0);
   }
-  const [helpful] = await db
-    .select()
-    .from(helpfulVotes)
-    .where(and(eq(helpfulVotes.postId, postId), eq(helpfulVotes.userId, actor.id)))
-    .limit(1);
   const [bm] = await db
     .select()
     .from(bookmarks)
@@ -476,6 +515,7 @@ export async function getPostDetail(actor: Actor, postId: string): Promise<PostD
     ...card,
     authorId: card.author.id,
     clubId: p.clubId,
+    anonymous: p.anonymous,
     decisionReason: p.authorId === actor.id || actor.isAdmin ? p.decisionReason : null,
     files: files.map((f) => ({
       id: f.id,
@@ -490,10 +530,9 @@ export async function getPostDetail(actor: Actor, postId: string): Promise<PostD
     viewer: {
       isOwner: p.authorId === actor.id,
       isAdmin: actor.isAdmin,
-      helpful: !!helpful,
       bookmarked: !!bm,
       rsvp: rsvp?.status ?? null,
-      canEditTitle: canEditTitle(actor, p),
+      canEdit: canEditPost(actor, p),
       canDelete: canDeletePost(actor, p),
       canInteract: canInteract(actor, p),
     },
@@ -505,9 +544,20 @@ export async function getPostDetail(actor: Actor, postId: string): Promise<PostD
 export async function getFileForViewer(actor: Actor, fileId: string) {
   if (!z.string().uuid().safeParse(fileId).success) return null;
   const [file] = await db.select().from(storedFiles).where(eq(storedFiles.id, fileId)).limit(1);
-  if (!file || file.purpose !== "attachment" || !file.postId) return null;
+  if (!file) return null;
   if (file.deletedAt && !actor.isAdmin) return null;
-  const [post] = await db.select().from(posts).where(eq(posts.id, file.postId)).limit(1);
+  let postId = file.postId;
+  if (file.purpose === "comment_attachment" && file.commentId) {
+    // Same visibility as the comment: gone once deleted, and hidden while reported (except for its author).
+    const [c] = await db.select().from(comments).where(eq(comments.id, file.commentId)).limit(1);
+    if (!c) return null;
+    if (!actor.isAdmin && (c.deletedAt || (c.hiddenByReports && c.authorId !== actor.id))) return null;
+    postId = c.postId;
+  } else if (file.purpose !== "attachment") {
+    return null;
+  }
+  if (!postId) return null;
+  const [post] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
   if (!post || !canViewPost(actor, post)) return null;
   return file;
 }
@@ -526,7 +576,7 @@ async function loadPost(postId: string): Promise<PostRow> {
 export async function editPostTitle(actor: Actor, postId: string, rawTitle: string): Promise<void> {
   const title = titleSchema.parse(rawTitle);
   const post = await loadPost(postId);
-  if (!canEditTitle(actor, post)) throw new ForbiddenError("You can only edit the title of your own posts.");
+  if (!canEditPost(actor, post)) throw new ForbiddenError("You can only edit your own posts.");
   if (title === post.title) return;
   await enforce("write", actor.id, LIMITS.writePerUser.limit, LIMITS.writePerUser.window);
   await assertClean(title);
@@ -536,9 +586,100 @@ export async function editPostTitle(actor: Actor, postId: string, rawTitle: stri
     await tx.insert(postTitleHistory).values({ postId, oldTitle: post.title, newTitle: title, editedBy: actor.id });
     await tx
       .update(posts)
-      .set({ title, titleEdited: true, updatedAt: new Date(), ...(needsReapproval ? { status: "pending" as const } : {}) })
+      .set({ title, titleEdited: true, editedAt: new Date(), updatedAt: new Date(), ...(needsReapproval ? { status: "pending" as const } : {}) })
       .where(eq(posts.id, postId));
   });
+}
+
+export type EditPostInput = Omit<CreatePostInput, "type"> & { keepFileIds?: string[] };
+
+/**
+ * The poster edits their post. Rejected posts and posts with requested changes go back to
+ * the approval queue; approved posts only do when the admin turned that setting on.
+ */
+export async function editPost(actor: Actor, postId: string, raw: EditPostInput): Promise<{ status: PostRow["status"] }> {
+  const post = await loadPost(postId);
+  if (!canEditPost(actor, post)) throw new ForbiddenError("You can only edit your own posts.");
+  const input = createPostSchema.parse({ ...raw, type: post.type });
+  await enforce("write", actor.id, LIMITS.writePerUser.limit, LIMITS.writePerUser.window);
+  const { links, eventData } = await checkPostContent(actor, input);
+
+  const existing = await db
+    .select({ id: storedFiles.id, position: storedFiles.position })
+    .from(storedFiles)
+    .where(and(eq(storedFiles.postId, postId), isNull(storedFiles.deletedAt)));
+  const keep = new Set((raw.keepFileIds ?? []).filter((id) => existing.some((f) => f.id === id)));
+  const removed = existing.filter((f) => !keep.has(f.id)).map((f) => f.id);
+  if (keep.size + input.files.length > MAX_FILES_PER_POST) throw new AppError(`You can attach up to ${MAX_FILES_PER_POST} files.`);
+
+  const settings = await getSettings();
+  const status: PostRow["status"] =
+    post.status === "rejected" || post.status === "changes_requested"
+      ? "pending"
+      : post.status === "approved" && settings.requireReapprovalAfterTitleEdit && !actor.isAdmin
+        ? "pending"
+        : post.status;
+  const subjectRows = await upsertSubjects(input.subjects);
+  const firstPosition = existing.reduce((m, f) => Math.max(m, f.position + 1), 0);
+  const files = await finaliseUploads(actor, postId, input.files, { firstPosition });
+  const now = new Date();
+  try {
+    await db.transaction(async (tx) => {
+      if (input.title !== post.title) {
+        await tx.insert(postTitleHistory).values({ postId, oldTitle: post.title, newTitle: input.title, editedBy: actor.id });
+      }
+      await tx
+        .update(posts)
+        .set({
+          title: input.title,
+          description: input.description,
+          subjectText: subjectRows.map((r) => r.name).join(" "),
+          semester: input.semester ?? null,
+          clubId: input.clubId ?? null,
+          links,
+          anonymous: input.anonymous,
+          titleEdited: post.titleEdited || input.title !== post.title,
+          editedAt: now,
+          updatedAt: now,
+          status,
+          ...(status === "pending" && post.status !== "pending" ? { decisionReason: null, decidedAt: null, decidedBy: null } : {}),
+        })
+        .where(eq(posts.id, postId));
+      await tx.delete(postSubjects).where(eq(postSubjects.postId, postId));
+      if (subjectRows.length) await tx.insert(postSubjects).values(subjectRows.map((r) => ({ postId, subjectId: r.id })));
+      if (post.type === "event" && eventData) {
+        await tx.insert(events).values({ postId, ...eventData }).onConflictDoUpdate({ target: events.postId, set: eventData });
+      }
+      if (removed.length) await tx.update(storedFiles).set({ deletedAt: now }).where(inArray(storedFiles.id, removed));
+      if (files.length) {
+        await tx.insert(storedFiles).values(
+          files.map((f, i) => ({ ownerId: actor.id, purpose: "attachment" as const, postId, position: firstPosition + i, ...f })),
+        );
+      }
+    });
+  } catch (err) {
+    await storage()
+      .delete(files.map((f) => f.storagePath))
+      .catch(() => {});
+    throw err;
+  }
+  return { status };
+}
+
+/** The admin can hide a post (members no longer see it) or show it again, without changing it. */
+export async function setPostHidden(actor: Actor, postId: string, hidden: boolean): Promise<void> {
+  if (!actor.isAdmin) throw new ForbiddenError();
+  const post = await loadPost(postId);
+  await db.update(posts).set({ hiddenByReports: hidden, updatedAt: new Date() }).where(eq(posts.id, postId));
+  await audit(actor, hidden ? "post.hide" : "post.unhide", { type: "post", id: postId }, null, { title: post.title });
+  if (hidden && post.authorId !== actor.id) {
+    await notify([post.authorId], {
+      kind: "decision",
+      title: `Your post "${post.title}" was hidden`,
+      body: "The admin hid this post while it is reviewed. Use the contact page if you think this is a mistake.",
+      link: `/posts/${postId}`,
+    });
+  }
 }
 
 /** Soft delete: hidden immediately, purged after 30 days. Admin must give a reason for other people's posts. */
@@ -565,21 +706,26 @@ export async function deletePost(actor: Actor, postId: string, reason?: string):
   }
 }
 
-export async function toggleHelpful(actor: Actor, postId: string): Promise<boolean> {
+/** Upvote (1), downvote (-1) or clear (0) the viewer's vote. Returns the post's new score. */
+export async function votePost(actor: Actor, postId: string, value: VoteValue | 0): Promise<number> {
   const post = await loadPost(postId);
   if (!canInteract(actor, post)) throw new NotFoundError();
-  if (post.authorId === actor.id) throw new AppError("You cannot mark your own post as helpful.");
-  const existing = await db
-    .delete(helpfulVotes)
-    .where(and(eq(helpfulVotes.postId, postId), eq(helpfulVotes.userId, actor.id)))
-    .returning();
-  const added = existing.length === 0;
-  if (added) await db.insert(helpfulVotes).values({ postId, userId: actor.id }).onConflictDoNothing();
-  await db
+  if (post.authorId === actor.id) throw new AppError("You can't vote on your own post.");
+  await enforce("vote", actor.id, LIMITS.votePerUser.limit, LIMITS.votePerUser.window);
+  if (value === 0) {
+    await db.delete(postVotes).where(and(eq(postVotes.postId, postId), eq(postVotes.userId, actor.id)));
+  } else {
+    await db
+      .insert(postVotes)
+      .values({ postId, userId: actor.id, value })
+      .onConflictDoUpdate({ target: [postVotes.postId, postVotes.userId], set: { value } });
+  }
+  const [row] = await db
     .update(posts)
-    .set({ helpfulCount: sql`(select count(*) from helpful_votes where post_id = ${postId})` })
-    .where(eq(posts.id, postId));
-  return added;
+    .set({ score: sql`(select coalesce(sum(value), 0)::int from post_votes where post_id = ${postId})` })
+    .where(eq(posts.id, postId))
+    .returning({ score: posts.score });
+  return row?.score ?? 0;
 }
 
 export async function toggleBookmark(actor: Actor, postId: string): Promise<boolean> {

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clubs, eventRsvps, events, notifications, otpCodes, posts, rateLimits, sessions, storedFiles, users } from "@/db/schema";
 import { formatDateTime } from "@/lib/dates";
@@ -31,7 +31,10 @@ export async function purgeDeleted(now: Date) {
   const oldPosts = await db.select({ id: posts.id }).from(posts).where(and(isNotNull(posts.deletedAt), lt(posts.deletedAt, cutoff)));
   let purgedPosts = 0;
   for (const p of oldPosts) {
-    const files = await db.select({ path: storedFiles.storagePath }).from(storedFiles).where(eq(storedFiles.postId, p.id));
+    const files = await db
+      .select({ path: storedFiles.storagePath })
+      .from(storedFiles)
+      .where(or(eq(storedFiles.postId, p.id), sql`${storedFiles.commentId} in (select id from comments where post_id = ${p.id})`));
     await store.delete(files.map((f) => f.path));
     await db.delete(posts).where(eq(posts.id, p.id)); // cascades to files, events, votes, bookmarks ...
     purgedPosts++;
@@ -58,6 +61,7 @@ export async function purgeDeleted(now: Date) {
       and(
         eq(users.status, "deleted"),
         sql`not exists (select 1 from posts p where p.author_id = ${users.id})`,
+        sql`not exists (select 1 from comments c where c.author_id = ${users.id})`,
         sql`not exists (select 1 from group_plans p where p.created_by = ${users.id})`,
         sql`not exists (select 1 from study_groups g where g.owner_id = ${users.id})`,
       ),

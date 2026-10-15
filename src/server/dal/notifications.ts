@@ -4,7 +4,8 @@ import { db } from "@/db";
 import { clubFollows, notificationSettings, notifications, postSubjects, subjectFollows, users } from "@/db/schema";
 import type { Actor } from "../actor-types";
 
-export type NotificationKind = "decision" | "followed" | "reminder" | "system";
+/** "reply" (comments and replies) is in-app only, never emailed. */
+export type NotificationKind = "decision" | "followed" | "reminder" | "system" | "reply";
 
 export interface NotifyInput {
   kind: NotificationKind;

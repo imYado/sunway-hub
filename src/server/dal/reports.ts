@@ -9,13 +9,14 @@ import type { Actor } from "../actor-types";
 import { AppError, NotFoundError } from "../errors";
 import { assertClean } from "../profanity";
 import { enforce, LIMITS } from "../rate-limit";
+import { describeComment, setCommentHidden } from "./comments";
 import { describeGroup, setGroupHidden } from "./groups";
 import { canViewPost } from "./policy";
 
 export const AUTO_HIDE_THRESHOLD = 3;
 
 export const reportSchema = z.object({
-  targetType: z.enum(["post", "user", "club", "study_group"]),
+  targetType: z.enum(["post", "user", "club", "study_group", "comment"]),
   targetId: z.string().uuid(),
   reason: z.enum(["copyright", "inappropriate", "harassment", "exam_material", "spam", "other"]),
   note: z.string().trim().max(REPORT_NOTE_MAX).optional().default(""),
@@ -34,6 +35,12 @@ export async function createReport(actor: Actor, raw: z.input<typeof reportSchem
     const [p] = await db.select().from(posts).where(eq(posts.id, input.targetId)).limit(1);
     if (!p || !canViewPost(actor, p)) throw new NotFoundError();
     if (p.authorId === actor.id) throw new AppError("You cannot report your own post.");
+  } else if (input.targetType === "comment") {
+    const c = await describeComment(input.targetId);
+    if (!c || c.deletedAt) throw new NotFoundError();
+    const [p] = await db.select().from(posts).where(eq(posts.id, c.postId)).limit(1);
+    if (!p || !canViewPost(actor, p)) throw new NotFoundError();
+    if (c.authorId === actor.id) throw new AppError("You cannot report your own comment.");
   } else if (input.targetType === "user") {
     const [u] = await db.select().from(users).where(eq(users.id, input.targetId)).limit(1);
     if (!u || u.status === "deleted") throw new NotFoundError();
@@ -69,6 +76,8 @@ export async function setHidden(targetType: ReportTarget, targetId: string, hidd
     await setGroupHidden(targetId, hidden);
   } else if (targetType === "post") {
     await db.update(posts).set({ hiddenByReports: hidden }).where(eq(posts.id, targetId));
+  } else if (targetType === "comment") {
+    await setCommentHidden(targetId, hidden);
   } else if (targetType === "user") {
     const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, targetId)).limit(1);
     if (u && u.email === env.adminEmail) return;

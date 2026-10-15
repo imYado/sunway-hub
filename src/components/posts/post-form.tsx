@@ -1,66 +1,67 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { CleanInput, CleanTextarea } from "@/components/ui/clean-input";
-import { FILE_RULES, MAX_FILES_PER_POST, formatBytes, precheckFile, safeFileName, type FileKind } from "@/lib/files";
+import { FILE_RULES, MAX_FILES_PER_POST, formatBytes, precheckFile, type FileKind } from "@/lib/files";
 import { PROFANITY_MESSAGE, containsProfanity } from "@/lib/profanity/filter";
 import {
   DESCRIPTION_MAX,
   LINK_LABEL_MAX,
   LINK_URL_MAX,
   MAX_LINKS_PER_POST,
-  MAX_SUBJECT_TAGS,
+  MAX_TAGS,
   OWN_WORK_STATEMENT,
   POST_TYPES,
   TITLE_MAX,
   cleanLinkUrl,
+  type PostType,
 } from "@/lib/rules";
-import { createPostAction } from "@/app/actions/posts";
+import { uploadToQuarantine } from "@/lib/upload-client";
+import { createPostAction, editPostAction } from "@/app/actions/posts";
+
+/** The current values of a post being edited. */
+export interface EditablePost {
+  id: string;
+  type: PostType;
+  title: string;
+  description: string;
+  tags: string[];
+  semester: string | null;
+  clubId: string | null;
+  anonymous: boolean;
+  links: { url: string; label: string }[];
+  files: { id: string; name: string; size: number }[];
+  event: { startsAt: string; endsAt: string; location: string; capacity: number | null } | null;
+}
 
 interface Props {
   userId: string;
+  /** Clubs this member manages: they can post as these clubs. */
   clubs: { id: string; name: string }[];
+  /** Every club, for tagging. */
+  allClubs: { id: string; name: string }[];
   semesters: string[];
   enabledKinds: FileKind[];
   storageDriver: "vercel" | "local";
-  defaultType?: "study" | "event" | "club";
+  defaultType?: PostType;
   defaultClubId?: string;
+  /** Set when editing an existing post. */
+  post?: EditablePost;
 }
 
-async function uploadOne(file: File, userId: string, driver: "vercel" | "local"): Promise<{ pathname: string; name: string }> {
-  const name = safeFileName(file.name);
-  const pathname = `quarantine/${userId}/${name.replace(/[^A-Za-z0-9._-]+/g, "_")}`;
-  if (driver === "local") {
-    const fd = new FormData();
-    fd.set("file", file);
-    fd.set("pathname", pathname);
-    const res = await fetch("/api/uploads/local", { method: "POST", body: fd });
-    const json = (await res.json()) as { pathname?: string; error?: string };
-    if (!res.ok || !json.pathname) throw new Error(json.error ?? "Upload failed.");
-    return { pathname: json.pathname, name };
-  }
-  const result = await upload(pathname, file, {
-    access: "private",
-    handleUploadUrl: "/api/uploads/authorize",
-    clientPayload: JSON.stringify({ name, size: file.size, contentType: file.type }),
-    contentType: file.type,
-    multipart: file.size > 8 * 1024 * 1024,
-  });
-  return { pathname: result.pathname, name };
-}
-
-export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDriver, defaultType = "study", defaultClubId }: Props) {
+export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, storageDriver, defaultType = "discussion", defaultClubId, post }: Props) {
   const router = useRouter();
   const formId = useId();
-  const [type, setType] = useState<"study" | "event" | "club">(defaultType);
+  const editing = !!post;
+  const [type, setType] = useState<PostType>(post?.type ?? defaultType);
   const [files, setFiles] = useState<File[]>([]);
-  const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
+  const [keptFiles, setKeptFiles] = useState(post?.files ?? []);
+  const [links, setLinks] = useState<{ url: string; label: string }[]>(post?.links ?? []);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkLabel, setLinkLabel] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(post?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
 
   function addTag(raw: string) {
     const t = raw.replace(/\s+/g, " ").trim().slice(0, 80);
-    if (!t || tags.includes(t) || tags.length >= MAX_SUBJECT_TAGS) return;
+    if (!t || tags.includes(t) || tags.length >= MAX_TAGS) return;
     if (containsProfanity(t)) {
       setError(PROFANITY_MESSAGE);
       return;
@@ -131,7 +132,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
         setError(problem);
         continue;
       }
-      if (next.length >= MAX_FILES_PER_POST) {
+      if (next.length + keptFiles.length >= MAX_FILES_PER_POST) {
         setError(`You can attach up to ${MAX_FILES_PER_POST} files.`);
         break;
       }
@@ -152,10 +153,10 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
       return;
     }
     if (type === "study" && tags.length === 0 && !tagInput.trim()) {
-      setError("Add at least one subject tag.");
+      setError("Add at least one tag, like the course code.");
       return;
     }
-    const allTags = tagInput.trim() && tags.length < MAX_SUBJECT_TAGS ? [...tags, tagInput.trim()] : tags;
+    const allTags = tagInput.trim() && tags.length < MAX_TAGS ? [...tags, tagInput.trim()] : tags;
     // A link typed but not added yet is included, like a half-typed tag.
     const pendingUrl = linkUrl.trim() ? cleanLinkUrl(linkUrl) : null;
     if (linkUrl.trim() && !pendingUrl) {
@@ -171,11 +172,10 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
       const uploaded: { pathname: string; name: string }[] = [];
       for (const [i, f] of files.entries()) {
         setProgress(`Uploading file ${i + 1} of ${files.length}: ${f.name}`);
-        uploaded.push(await uploadOne(f, userId, storageDriver));
+        uploaded.push(await uploadToQuarantine(f, userId, storageDriver));
       }
-      setProgress("Checking your files...");
-      const result = await createPostAction({
-        type,
+      setProgress(files.length ? "Checking your files..." : "Saving...");
+      const fields = {
         title,
         description,
         subjects: allTags,
@@ -183,6 +183,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
         clubId: String(fd.get("clubId") ?? ""),
         links: allLinks,
         anonymous: type !== "club" && fd.get("anonymous") === "on",
+        keepFileIds: keptFiles.map((f) => f.id),
         ownWork: fd.get("ownWork") === "on" ? true : (false as unknown as true),
         files: uploaded,
         event:
@@ -194,7 +195,8 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
                 capacity: String(fd.get("capacity") ?? "") as unknown as number,
               }
             : undefined,
-      });
+      };
+      const result = post ? await editPostAction(post.id, fields) : await createPostAction({ ...fields, type });
       if (!result?.ok) {
         setError(result?.error ?? "Something went wrong. Please try again.");
         setProgress(null);
@@ -202,6 +204,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
       }
       const data = result.data as { id: string };
       router.push(`/posts/${data.id}`);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
       setProgress(null);
@@ -214,6 +217,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
 
   return (
     <form onSubmit={onSubmit} aria-describedby={error ? `${formId}-error` : undefined}>
+      {!editing && (
       <fieldset className="mb-4">
         <legend className="label">Type</legend>
         <div className="flex flex-wrap gap-4">
@@ -225,27 +229,28 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
           ))}
         </div>
       </fieldset>
+      )}
 
       <div className="mb-4">
         <label htmlFor="title" className="label">
           Title
         </label>
-        <CleanInput id="title" name="title" required minLength={5} maxLength={TITLE_MAX} />
+        <CleanInput id="title" name="title" required minLength={5} maxLength={TITLE_MAX} defaultValue={post?.title} />
       </div>
 
       <div className="mb-4">
         <label htmlFor="description" className="label">
           Description
         </label>
-        <CleanTextarea id="description" name="description" maxLength={DESCRIPTION_MAX} rows={6} showCount />
+        <CleanTextarea id="description" name="description" maxLength={DESCRIPTION_MAX} rows={6} showCount defaultValue={post?.description} />
       </div>
 
       <div className="mb-4">
         <label htmlFor="subject" className="label">
-          Subject tags {type === "study" ? "" : "(optional)"}
+          Tags {type === "study" ? "" : "(optional)"}
         </label>
         {tags.length > 0 && (
-          <ul className="mb-2 flex flex-wrap gap-2" aria-label="Selected subjects">
+          <ul className="mb-2 flex flex-wrap gap-2" aria-label="Selected tags">
             {tags.map((t) => (
               <li key={t} className="badge gap-1">
                 {t}
@@ -261,7 +266,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
           className="input"
           value={tagInput}
           list={`${formId}-subjects`}
-          disabled={tags.length >= MAX_SUBJECT_TAGS}
+          disabled={tags.length >= MAX_TAGS}
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === ",") {
@@ -269,7 +274,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
               addTag(tagInput);
             }
           }}
-          placeholder="e.g. CSC1024 Programming Principles"
+          placeholder="e.g. CSC1024, Past Papers, Food"
           aria-describedby="subject-hint"
         />
         <datalist id={`${formId}-subjects`}>
@@ -278,7 +283,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
           ))}
         </datalist>
         <p id="subject-hint" className="hint">
-          Course code or name. Press Enter to add. Up to {MAX_SUBJECT_TAGS}.
+          A course code, topic or anything that helps people find it. Press Enter to add. Up to {MAX_TAGS}.
         </p>
       </div>
 
@@ -287,7 +292,7 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
           <label htmlFor="semester" className="label">
             Semester
           </label>
-          <select id="semester" name="semester" className="input" defaultValue="">
+          <select id="semester" name="semester" className="input" defaultValue={post?.semester ?? ""}>
             <option value="">Not specific</option>
             {semesters.map((s) => (
               <option key={s} value={s}>
@@ -296,14 +301,21 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
             ))}
           </select>
         </div>
-        {clubs.length > 0 && (
+        {(type === "club" ? clubs : allClubs).length > 0 && (
           <div>
             <label htmlFor="clubId" className="label">
-              Club {type === "club" ? "" : "(optional)"}
+              {type === "club" ? "Club" : "Club tag (optional)"}
             </label>
-            <select id="clubId" name="clubId" className="input" defaultValue={defaultClubId ?? ""} required={type === "club"}>
+            <select
+              key={type === "club" ? "own" : "all"}
+              id="clubId"
+              name="clubId"
+              className="input"
+              defaultValue={post?.clubId ?? defaultClubId ?? ""}
+              required={type === "club"}
+            >
               <option value="">None</option>
-              {clubs.map((c) => (
+              {(type === "club" ? clubs : allClubs).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -320,33 +332,47 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
             <label htmlFor="startsAt" className="label">
               Starts
             </label>
-            <input id="startsAt" name="startsAt" type="datetime-local" required className="input" />
+            <input id="startsAt" name="startsAt" type="datetime-local" required className="input" defaultValue={post?.event?.startsAt} />
           </div>
           <div>
             <label htmlFor="endsAt" className="label">
               Ends (optional)
             </label>
-            <input id="endsAt" name="endsAt" type="datetime-local" className="input" />
+            <input id="endsAt" name="endsAt" type="datetime-local" className="input" defaultValue={post?.event?.endsAt} />
           </div>
           <div>
             <label htmlFor="location" className="label">
               Location
             </label>
-            <CleanInput id="location" name="location" required maxLength={200} />
+            <CleanInput id="location" name="location" required maxLength={200} defaultValue={post?.event?.location} />
           </div>
           <div>
             <label htmlFor="capacity" className="label">
               Capacity (optional)
             </label>
-            <input id="capacity" name="capacity" type="number" min={1} className="input" />
+            <input id="capacity" name="capacity" type="number" min={1} className="input" defaultValue={post?.event?.capacity ?? undefined} />
           </div>
           <p className="text-sm text-muted sm:col-span-2">Attach a poster image below if you have one.</p>
         </fieldset>
       )}
 
       <div className="mb-4">
+        {keptFiles.length > 0 && (
+          <ul className="mb-2 space-y-1" aria-label="Current attachments">
+            {keptFiles.map((f) => (
+              <li key={f.id} className="card flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                <span className="break-all">
+                  {f.name} <span className="text-muted">({formatBytes(f.size)})</span>
+                </span>
+                <button type="button" className="btn btn-sm" onClick={() => setKeptFiles(keptFiles.filter((k) => k.id !== f.id))} aria-label={`Remove ${f.name}`}>
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <label htmlFor="files" className="label">
-          Attachments (optional)
+          {editing ? "Add attachments (optional)" : "Attachments (optional)"}
         </label>
         <input
           ref={fileInput}
@@ -449,7 +475,14 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
 
       {type !== "club" && (
         <div className="mb-4 flex items-start gap-3">
-          <input id="anonymous" name="anonymous" type="checkbox" className="mt-1 h-5 w-5 shrink-0" aria-describedby="anonymous-hint" />
+          <input
+            id="anonymous"
+            name="anonymous"
+            type="checkbox"
+            defaultChecked={post?.anonymous}
+            className="mt-1 h-5 w-5 shrink-0"
+            aria-describedby="anonymous-hint"
+          />
           <div>
             <label htmlFor="anonymous" className="text-sm font-medium">
               Post anonymously
@@ -469,11 +502,13 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
       </div>
 
       <p className="mb-4 text-sm text-muted">
-        The admin reviews every post before others can see it. After submitting you can only edit the title.
+        {editing
+          ? "Your changes show as edited. If the admin asked for changes, saving sends the post back for approval."
+          : "The admin reviews every post before others can see it. You can edit it later."}
       </p>
 
       <button type="submit" className="btn btn-primary" disabled={busy}>
-        {busy ? "Submitting..." : "Submit for approval"}
+        {busy ? (editing ? "Saving..." : "Submitting...") : editing ? "Save changes" : "Submit for approval"}
       </button>
       {progress && (
         <p role="status" className="mt-2 text-sm text-muted">

@@ -41,4 +41,6 @@ export const LIMITS = {
   searchPerUser: { limit: 120, window: 60 },
   contactPerIp: { limit: 5, window: 3600 },
   writePerUser: { limit: 60, window: 3600 },
+  votePerUser: { limit: 300, window: 3600 },
+  commentPerUser: { limit: 60, window: 3600 },
 } as const;

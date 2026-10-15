@@ -71,7 +71,10 @@ export const TITLE_MIN = 5;
 export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 2000;
 export const REPORT_NOTE_MAX = 500;
-export const MAX_SUBJECT_TAGS = 3;
+export const MAX_TAGS = 5;
+export const COMMENT_MAX = 5000;
+/** Replies deeper than this are shown at this depth, so threads stay readable on a phone. */
+export const COMMENT_MAX_DEPTH = 6;
 export const MAX_LINKS_PER_POST = 15;
 export const LINK_URL_MAX = 500;
 export const LINK_LABEL_MAX = 100;
@@ -108,10 +111,13 @@ export const ROLE_OPTIONS = [
 ] as const;
 
 export const POST_TYPES = [
-  { value: "study", label: "Study Material" },
+  { value: "discussion", label: "Discussion" },
+  { value: "study", label: "Notes" },
   { value: "event", label: "Event" },
   { value: "club", label: "Club Post" },
 ] as const;
+export type PostType = (typeof POST_TYPES)[number]["value"];
+export const POST_TYPE_LABEL: Record<PostType, string> = Object.fromEntries(POST_TYPES.map((t) => [t.value, t.label])) as Record<PostType, string>;
 
 export const REPORT_REASONS = [
   { value: "copyright", label: "Copyright" },

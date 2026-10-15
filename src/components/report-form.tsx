@@ -4,10 +4,18 @@ import { CleanTextarea } from "@/components/ui/clean-input";
 import { REPORT_NOTE_MAX, REPORT_REASONS } from "@/lib/rules";
 import { reportAction } from "@/app/actions/posts";
 
-export function ReportForm({ targetType, targetId }: { targetType: "post" | "user" | "club" | "study_group"; targetId: string }) {
+export function ReportForm({
+  targetType,
+  targetId,
+  className = "mt-4",
+}: {
+  targetType: "post" | "user" | "club" | "study_group" | "comment";
+  targetId: string;
+  className?: string;
+}) {
   const id = `report-${targetType}-${targetId}`;
   return (
-    <details className="mt-4">
+    <details className={className}>
       <summary className="btn btn-sm cursor-pointer list-none">
         <Flag size={14} aria-hidden="true" /> Report
       </summary>

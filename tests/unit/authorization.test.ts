@@ -29,7 +29,7 @@ import {
   getPostDetail,
   listProfilePosts,
   searchPosts,
-  toggleHelpful,
+  votePost,
 } from "@/server/dal/posts";
 import { createReport } from "@/server/dal/reports";
 import { getAvatarFileForViewer, getProfile, updateProfile, uploadAvatar } from "@/server/dal/users";
@@ -140,7 +140,7 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     await expect(fullBackup(stale)).rejects.toThrow(/confirm your password/);
   });
 
-  it("posters may edit the title only, and only their own", async () => {
+  it("posters may edit their own posts; title edits are kept in the history", async () => {
     const { id } = await newStudyPost(alice, "Original title here");
     await expect(editPostTitle(bob, id, "Hijacked title")).rejects.toThrow(/own posts/);
     await expect(editPostTitle(alice, id, "Bad")).rejects.toThrow(/at least 5/);
@@ -152,9 +152,6 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     expect(p.description).toBe("My own summary of week 3.");
     const history = await db.select().from(postTitleHistory).where(eq(postTitleHistory.postId, id));
     expect(history[0]).toMatchObject({ oldTitle: "Original title here", newTitle: "Better title for notes" });
-    // The DAL exposes no function that changes description, tags, semester or files after submission.
-    const dal = await import("@/server/dal/posts");
-    expect(Object.keys(dal).filter((k) => /^(edit|update)/i.test(k))).toEqual(["editPostTitle"]);
     // Admin can revert.
     await revertTitle(admin, history[0].id);
     const [reverted] = await db.select().from(posts).where(eq(posts.id, id));
@@ -210,15 +207,18 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     await expect(updateClubAsManager(bobManager, club.id, { description: "shit club" })).rejects.toThrow(/inappropriate/);
   });
 
-  it("helpful: one vote per member, not on own posts, only on approved posts", async () => {
-    const { id } = await newStudyPost(alice, "Helpful candidate post");
-    await expect(toggleHelpful(bob, id)).rejects.toThrow(/could not find/);
+  it("votes: one per member, up or down, not on own posts, only on approved posts", async () => {
+    const { id } = await newStudyPost(alice, "Vote candidate post");
+    await expect(votePost(bob, id, 1)).rejects.toThrow(/could not find/);
     await decidePost(admin, id, { decision: "approve" });
-    await expect(toggleHelpful(alice, id)).rejects.toThrow(/own post/);
-    expect(await toggleHelpful(bob, id)).toBe(true);
-    expect((await getPostDetail(alice, id)).helpfulCount).toBe(1);
-    expect(await toggleHelpful(bob, id)).toBe(false);
-    expect((await getPostDetail(alice, id)).helpfulCount).toBe(0);
+    await expect(votePost(alice, id, 1)).rejects.toThrow(/own post/);
+    expect(await votePost(bob, id, 1)).toBe(1);
+    expect(await votePost(bob, id, 1)).toBe(1);
+    expect((await getPostDetail(alice, id)).score).toBe(1);
+    expect(await votePost(admin, id, -1)).toBe(0);
+    expect(await votePost(bob, id, -1)).toBe(-2);
+    expect((await getPostDetail(bob, id)).viewerVote).toBe(-1);
+    expect(await votePost(bob, id, 0)).toBe(-1);
   });
 
   it("3 reports from different members hide content automatically", async () => {

@@ -76,10 +76,11 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await signInMember(alice, ALICE);
   await alice.goto("/posts/new");
   await ready(alice);
+  await alice.getByRole("radio", { name: "Notes" }).check();
   await alice.getByLabel("Title").fill("Week 3 notes on recursion");
   await alice.getByLabel("Description").fill("My own summary with a diagram.");
-  await alice.getByLabel(/Subject tags/).fill("CSC1024 Programming Principles");
-  await alice.getByLabel(/Subject tags/).press("Enter");
+  await alice.getByLabel(/^Tags/).fill("CSC1024 Programming Principles");
+  await alice.getByLabel(/^Tags/).press("Enter");
   await alice.getByLabel("Semester").selectOption("Jan 2026");
   await alice.getByLabel("Attachments (optional)").setInputFiles(await pngFile());
   await alice.getByLabel(/This is my own work/).check();
@@ -115,8 +116,34 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   const ok = await bob.request.get(fileSrc!);
   expect(ok.status()).toBe(200);
   expect(ok.headers()["x-content-type-options"]).toBe("nosniff");
-  await bob.getByRole("button", { name: /Helpful/ }).click();
-  await expect(bob.getByRole("button", { name: /Helpful \(1\)/ })).toBeVisible();
+  await bob.getByRole("button", { name: "Upvote this post" }).click();
+  await expect(bob.getByRole("button", { name: "Upvote this post" })).toHaveAttribute("aria-pressed", "true");
+  await expect(bob.getByLabel("Score 1").first()).toBeVisible();
+
+  // Bob comments with a PDF; Alice replies and edits her post.
+  await bob.getByLabel("Add a comment").fill("Thanks, this helped with the tutorial.");
+  await bob.locator("#comments").getByText("Attach").locator("input[type=file]").setInputFiles({
+    name: "worked-example.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n", "latin1"),
+  });
+  await bob.getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(bob.getByText("Thanks, this helped with the tutorial.")).toBeVisible();
+  await expect(bob.getByText("worked-example.pdf")).toBeVisible();
+  await alice.goto(postUrl);
+  await ready(alice);
+  await alice.getByRole("button", { name: "Reply" }).click();
+  await alice.getByLabel("Your reply").fill("Glad it helped!");
+  await alice.getByRole("button", { name: "Reply", exact: true }).last().click();
+  await expect(alice.getByText("Glad it helped!")).toBeVisible();
+  await alice.getByRole("link", { name: "Edit" }).click();
+  await ready(alice);
+  await alice.getByLabel("Description").fill("My own summary with a diagram, now with an example.");
+  await alice.getByLabel(/This is my own work/).check();
+  await alice.getByRole("button", { name: "Save changes" }).click();
+  await alice.waitForURL((u) => u.pathname === postUrl);
+  await expect(alice.getByText("now with an example")).toBeVisible();
+  await expect(alice.getByText(/\(edited/)).toBeVisible();
   await bob.goto("/");
   await expect(bob.getByRole("link", { name: "Week 3 notes on recursion" })).toBeVisible();
   await Promise.all([alice.close(), bob.close(), admin.close()]);
@@ -248,8 +275,8 @@ test("delete by admin (with reason) and by poster", async ({ browser }) => {
   await alice.goto("/posts/new");
   await ready(alice);
   await alice.getByLabel("Title").fill("A post I will delete");
-  await alice.getByLabel(/Subject tags/).fill("MTH1114 Computer Mathematics");
-  await alice.getByLabel(/Subject tags/).press("Enter");
+  await alice.getByLabel(/^Tags/).fill("MTH1114 Computer Mathematics");
+  await alice.getByLabel(/^Tags/).press("Enter");
   await alice.getByLabel(/This is my own work/).check();
   await alice.getByRole("button", { name: "Submit for approval" }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);

@@ -23,6 +23,18 @@ export const FILE_RULES: Record<FileKind, { mime: string[]; ext: string[]; maxBy
 };
 
 export const MAX_FILES_PER_POST = 10;
+// Comments take fewer, smaller files, and only images and PDFs.
+export const COMMENT_FILE_KINDS: FileKind[] = ["image", "pdf"];
+export const COMMENT_FILE_MAX_BYTES = 5 * MB;
+export const MAX_FILES_PER_COMMENT = 3;
+
+/** precheckFile for a comment attachment: images and PDFs up to 5 MB. */
+export function precheckCommentFile(file: { name: string; type: string; size: number }, enabledKinds: FileKind[]): string | null {
+  const problem = precheckFile(file, enabledKinds.filter((k) => COMMENT_FILE_KINDS.includes(k)));
+  if (problem) return problem.replace("is not an allowed file type.", "can't be attached to a comment. Use a JPG, PNG, WebP or PDF.");
+  if (file.size > COMMENT_FILE_MAX_BYTES) return `"${file.name}" is too large. Comment attachments can be up to ${COMMENT_FILE_MAX_BYTES / MB} MB.`;
+  return null;
+}
 export const AVATAR_MAX_BYTES = 2 * MB;
 export const AVATAR_MIME = ["image/jpeg", "image/png", "image/webp"];
 

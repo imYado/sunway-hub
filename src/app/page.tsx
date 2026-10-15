@@ -2,11 +2,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/layout/page-skeleton";
 import { EmptyState, PageTitle } from "@/components/ui/empty";
+import { FeedControls, parseType } from "@/components/posts/feed-controls";
 import { Pagination, PostList } from "@/components/posts/post-card";
 import { requireMember } from "@/server/actor";
-import { listFeed } from "@/server/dal/posts";
+import { listFeed, parseSort } from "@/server/dal/posts";
 
-export default function HomePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+type SP = { page?: string; type?: string; sort?: string };
+
+export default function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
     <Suspense fallback={<PageSkeleton />}>
       <Feed searchParams={searchParams} />
@@ -14,30 +17,36 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ pag
   );
 }
 
-async function Feed({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireMember();
-  const page = Number((await searchParams).page ?? "1") || 1;
-  const feed = await listFeed(actor, page);
+  const sp = await searchParams;
+  const page = Number(sp.page ?? "1") || 1;
+  const type = parseType(sp.type);
+  const sort = parseSort(sp.sort, "hot");
+  const feed = await listFeed(actor, { page, type, sort });
+  const params = new URLSearchParams(Object.entries({ type, sort }).filter(([, v]) => v) as [string, string][]);
   return (
     <div>
       <PageTitle
         actions={
-          <Link href="/posts/new" className="btn btn-primary">
-            Share notes
+          <Link href={type ? `/posts/new?type=${type}` : "/posts/new"} className="btn btn-primary">
+            New post
           </Link>
         }
       >
-        Latest
+        Home
       </PageTitle>
+      <FeedControls base="/" type={type} sort={sort} />
       <PostList
         posts={feed.items}
+        path="/"
         empty={
           <EmptyState title="Nothing here yet">
-            Be the first to <Link href="/posts/new">share your notes</Link>. Every post is checked by the admin before it appears.
+            Be the first to <Link href="/posts/new">post something</Link>. Every post is checked by the admin before it appears.
           </EmptyState>
         }
       />
-      <Pagination page={feed.page} pages={feed.pages} makeHref={(p) => `/?page=${p}`} />
+      <Pagination page={feed.page} pages={feed.pages} makeHref={(p) => `/?${params.toString()}&page=${p}`} />
     </div>
   );
 }
