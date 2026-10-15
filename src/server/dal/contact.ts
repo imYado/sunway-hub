@@ -35,16 +35,22 @@ export function postIdFromUrl(url: string): string | null {
 export async function submitContact(actor: Actor | null, raw: z.input<typeof contactSchema>, ipKey: string): Promise<{ hidden: boolean }> {
   const input = contactSchema.parse(raw);
   await enforce("contact", ipKey, LIMITS.contactPerIp.limit, LIMITS.contactPerIp.window);
+  await enforce("contact-day", ipKey, LIMITS.contactPerIpDay.limit, LIMITS.contactPerIpDay.window);
   const email = normaliseEmail(input.email);
   if (!isValidEmailShape(email)) throw new AppError("Enter a valid email address so we can reply.");
-  await assertClean(input.name, input.subject, input.message);
+  const local = email.split("@")[0];
+  await assertClean(input.name, input.subject, input.message, input.contentUrl, local.replace(/[._+-]+/g, " "), local.replace(/[._+-]+/g, ""));
   let hiddenPostId: string | null = null;
   if (input.kind === "takedown") {
     if (!input.contentUrl) throw new AppError("Add the link to the content you want removed.");
     const id = postIdFromUrl(input.contentUrl);
+    // Takedowns are only for posts on this site, so the link must point at one.
+    if (!id) throw new AppError("Paste the link to the post on SJ Study, for example https://.../posts/... .");
+    const [exists] = await db.select({ id: posts.id }).from(posts).where(eq(posts.id, id)).limit(1);
+    if (!exists) throw new AppError("We couldn't find that post. Check the link and try again.");
     // Only signed-in, verified members can hide a post straight away; anyone else's
     // request waits for the admin, or a stranger could hide any post.
-    if (id && actor && !actor.guest && (await isSunwayVerified(actor.id))) {
+    if (actor && !actor.guest && (await isSunwayVerified(actor.id))) {
       const [p] = await db
         .select({ id: posts.id, authorEmail: users.email })
         .from(posts)

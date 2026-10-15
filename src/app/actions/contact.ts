@@ -9,6 +9,8 @@ export async function contactAction(_: ActionState, fd: FormData): Promise<Actio
   return runAction(async () => {
     const actor = await getActor();
     const kind = str(fd, "kind") === "takedown" ? "takedown" : "contact";
+    // A hidden field people never see; bots fill it in. Pretend it worked.
+    if (str(fd, "website")) return kind === "takedown" ? "Thank you. The admin will review your request within 48 hours." : "Thank you. Your message has been sent.";
     const r = await submitContact(
       actor,
       {

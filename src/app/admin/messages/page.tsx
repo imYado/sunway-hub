@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { EmptyState, PageTitle } from "@/components/ui/empty";
 import { formatDateTime } from "@/lib/dates";
-import { messageHandledAction } from "@/app/actions/admin";
+import { messageDeleteAction, messageHandledAction } from "@/app/actions/admin";
 import { requireAdminPage } from "@/server/actor";
 import { listMessages } from "@/server/dal/admin";
 
@@ -35,14 +35,22 @@ export default async function MessagesPage() {
                 </p>
               )}
               <p className="mt-2 whitespace-pre-wrap">{m.message}</p>
-              {!m.handledAt && (
-                <ActionForm action={messageHandledAction} className="mt-2">
+              <div className="mt-2 flex flex-wrap gap-2">
+                {!m.handledAt && (
+                  <ActionForm action={messageHandledAction}>
+                    <input type="hidden" name="id" value={m.id} />
+                    <SubmitButton variant="default" size="sm">
+                      Mark handled
+                    </SubmitButton>
+                  </ActionForm>
+                )}
+                <ActionForm action={messageDeleteAction}>
                   <input type="hidden" name="id" value={m.id} />
-                  <SubmitButton variant="default" size="sm">
-                    Mark handled
+                  <SubmitButton variant="danger" size="sm">
+                    Delete (spam or abuse)
                   </SubmitButton>
                 </ActionForm>
-              )}
+              </div>
             </li>
           ))}
         </ul>

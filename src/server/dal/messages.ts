@@ -3,7 +3,8 @@ import { assertSunwayVerified } from "./verification";
 import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { conversations, directMessages, posts, reports, storedFiles, users } from "@/db/schema";
+import { conversations, directMessages, posts, reports, storedFiles, userAvatars, users } from "@/db/schema";
+import { areFriends } from "./friends";
 import { decryptText, encryptText } from "@/lib/crypto";
 import { env } from "@/lib/env";
 import { MAX_FILES_PER_DM } from "@/lib/files";
@@ -75,13 +76,14 @@ function recipientHidden(c: ConversationRow): boolean {
   return c.recipientAnonymous && !c.recipientRevealed;
 }
 
-type UserBits = { id: string; username: string | null; displayName: string | null; status: string };
+type UserBits = { id: string; username: string | null; displayName: string | null; status: string; avatar: string | null };
 
 async function loadUsers(ids: string[]): Promise<Map<string, UserBits>> {
   if (ids.length === 0) return new Map();
   const rows = await db
-    .select({ id: users.id, username: users.username, displayName: users.displayName, status: users.status })
+    .select({ id: users.id, username: users.username, displayName: users.displayName, status: users.status, avatar: userAvatars.approvedFileId })
     .from(users)
+    .leftJoin(userAvatars, eq(userAvatars.userId, users.id))
     .where(inArray(users.id, [...new Set(ids)]));
   return new Map(rows.map((u) => [u.id, u]));
 }
@@ -94,14 +96,13 @@ export interface OtherParty {
   name: string;
   anonymous: boolean;
   deleted: boolean;
+  hasAvatar: boolean;
 }
 
 function otherParty(c: ConversationRow, role: "starter" | "recipient", u: UserBits | undefined): OtherParty {
-  if (role === "starter" && recipientHidden(c)) return { id: null, username: null, name: "Anonymous poster", anonymous: true, deleted: false };
-  if (!u || u.status === "deleted") return { id: null, username: null, name: "Deleted user", anonymous: false, deleted: true };
-  return {
-    id: u.id,
-    username: u.username, name: u.displayName ?? u.username ?? "Member", anonymous: false, deleted: false };
+  if (role === "starter" && recipientHidden(c)) return { id: null, username: null, name: "Anonymous poster", anonymous: true, deleted: false, hasAvatar: false };
+  if (!u || u.status === "deleted") return { id: null, username: null, name: "Deleted user", anonymous: false, deleted: true, hasAvatar: false };
+  return { id: u.id, username: u.username, name: u.displayName ?? u.username ?? "Member", anonymous: false, deleted: false, hasAvatar: !!u.avatar };
 }
 
 function myReadAt(c: ConversationRow, role: "starter" | "recipient"): Date | null {
@@ -206,7 +207,9 @@ export async function startConversation(actor: Actor, raw: z.input<typeof startS
     }
   }
 
-  await enforce("dm-request", actor.id, DM_REQUESTS_PER_DAY, 86_400);
+  // Friends talk straight away; everyone else starts with a request.
+  const friends = !anonymous && (await areFriends(actor.id, recipientId));
+  if (!friends) await enforce("dm-request", actor.id, DM_REQUESTS_PER_DAY, 86_400);
   // Requests reach people who haven't agreed to talk yet, so they go through the word filter.
   await assertClean(input.body);
   const now = new Date();
@@ -219,8 +222,8 @@ export async function startConversation(actor: Actor, raw: z.input<typeof startS
         .set({
           starterId: actor.id,
           recipientId,
-          status: "pending",
-          respondedAt: null,
+          status: friends ? "accepted" : "pending",
+          respondedAt: friends ? now : null,
           blockedBy: null,
           lastMessageAt: now,
           lastSenderId: actor.id,
@@ -238,6 +241,7 @@ export async function startConversation(actor: Actor, raw: z.input<typeof startS
           postId,
           postTitle,
           recipientAnonymous: anonymous,
+          ...(friends ? { status: "accepted" as const, respondedAt: now } : {}),
           lastMessageAt: now,
           lastSenderId: actor.id,
           starterReadAt: now,
@@ -251,7 +255,11 @@ export async function startConversation(actor: Actor, raw: z.input<typeof startS
   const starterName = actor.displayName ?? (actor.username ? `@${actor.username}` : "A member");
   await notify([recipientId], {
     kind: "message",
-    title: anonymous ? `${starterName} wants to message you about your anonymous post "${postTitle}"` : `${starterName} sent you a message request`,
+    title: anonymous
+      ? `${starterName} wants to message you about your anonymous post "${postTitle}"`
+      : friends
+        ? `${starterName} sent you a message`
+        : `${starterName} sent you a message request`,
     link: `/messages/${id}`,
   });
   return { id };
@@ -469,6 +477,8 @@ export interface ConversationView {
   blockedByMe: boolean;
   messages: MessageView[];
   canSend: boolean;
+  /** Whether the two of us are friends (never set when one side is anonymous). */
+  friends: boolean;
 }
 
 async function messageFiles(messageIds: string[], includeDeleted: boolean) {
@@ -511,6 +521,7 @@ export async function getConversation(actor: Actor, conversationId: string): Pro
     iAmHidden: c.role === "recipient" && recipientHidden(c),
     blockedByMe: c.status === "blocked" && c.blockedBy === actor.id,
     canSend: c.status === "accepted",
+    friends: !c.recipientAnonymous && (await areFriends(c.starterId, c.recipientId)),
     messages: rows.map((m) => ({
       id: m.id,
       mine: m.senderId === actor.id,

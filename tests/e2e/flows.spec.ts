@@ -393,6 +393,9 @@ for (const colorScheme of ["light", "dark"] as const) test(`accessibility (${col
   for (const p of [
     "/",
     "/search",
+    "/search?q=notes",
+    "/friends",
+    "/messages/new?to=alice_s",
     "/market",
     "/messages",
     "/subjects",
@@ -452,5 +455,62 @@ test("on a phone the main pages sit in a bar along the bottom", async ({ browser
   // Everything else is in the "More" menu at the top.
   await page.locator("header").getByLabel("More").click();
   await expect(page.locator("header").getByRole("link", { name: "Study groups" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Hot / New / Top is one button that opens a sheet from the bottom.
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: "Sort: Hot" }).click();
+  const sheet = page.getByRole("dialog", { name: "Sort posts" });
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole("link", { name: /^New/ }).click();
+  await page.waitForURL(/sort=new/);
+  await expect(page.getByRole("button", { name: "Sort: New" })).toBeVisible();
   await context.close();
+});
+
+test("find people by username, become friends, and message without a request", async ({ browser }) => {
+  const hana = await browser.newPage();
+  await signInMember(hana, "hana@imail.sunway.edu.my", "hana_s");
+  const ivan = await browser.newPage();
+  await signInMember(ivan, "ivan@imail.sunway.edu.my", "ivan_r");
+
+  // Search finds people by username, never by email.
+  await hana.goto("/search?q=ivan&tab=people");
+  await expect(hana.getByRole("link", { name: /@ivan_r/ })).toBeVisible();
+  await hana.goto("/search?q=imail.sunway&tab=people");
+  await expect(hana.getByText("No one found")).toBeVisible();
+
+  // Not friends yet: the new message screen explains it will be a request.
+  await hana.goto("/messages/new?to=ivan_r");
+  await expect(hana.getByText("This will be a message request")).toBeVisible();
+
+  await hana.goto("/u/ivan_r");
+  await ready(hana);
+  await hana.getByRole("button", { name: "Add friend" }).click();
+  await expect(hana.getByRole("button", { name: "Cancel request" })).toBeVisible();
+
+  await ivan.goto("/friends");
+  await ready(ivan);
+  await ivan.getByRole("button", { name: "Accept friend request" }).click();
+  await expect(ivan.getByRole("heading", { name: "Your friends (1)" })).toBeVisible();
+
+  // Friends message each other straight away.
+  await hana.goto("/messages/new?to=ivan_r");
+  await ready(hana);
+  await expect(hana.getByText("You're friends")).toBeVisible();
+  await hana.getByLabel("Your message").fill("Library at 3?");
+  await hana.getByRole("button", { name: "Send", exact: true }).click();
+  await hana.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+  await expect(hana.getByLabel("Message", { exact: true })).toBeVisible();
+
+  // Unfriending ends it for both.
+  await ivan.goto("/u/hana_s");
+  await ready(ivan);
+  ivan.once("dialog", (d) => d.accept());
+  await ivan.getByRole("button", { name: "Unfriend" }).click();
+  await expect(ivan.getByRole("button", { name: "Add friend" })).toBeVisible();
+  await hana.goto("/friends");
+  await expect(hana.getByRole("heading", { name: "Your friends (0)" })).toBeVisible();
+  await Promise.all([hana.close(), ivan.close()]);
 });

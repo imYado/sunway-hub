@@ -114,7 +114,7 @@ export const POST_TYPES = [
   { value: "discussion", label: "Discussion" },
   { value: "study", label: "Notes" },
   { value: "event", label: "Event" },
-  { value: "club", label: "Club Post" },
+  { value: "club", label: "Official club post" },
   { value: "market", label: "Market" },
 ] as const;
 export type PostType = (typeof POST_TYPES)[number]["value"];

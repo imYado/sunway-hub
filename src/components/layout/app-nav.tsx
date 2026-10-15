@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Bell,
+  Contact,
   BookOpen,
   Calendar,
   CalendarDays,
@@ -59,6 +61,7 @@ function Badge({ n }: { n?: number }) {
 
 function accessibleLabel(item: Item) {
   if (!item.count) return item.label;
+  if (item.href === "/friends") return `${item.label}, ${item.count} request${item.count === 1 ? "" : "s"}`;
   return item.href === "/notifications" ? `${item.label}, ${item.count} unread` : `${item.label}, ${item.count} new`;
 }
 
@@ -87,6 +90,7 @@ function MenuLinks({ items }: { items: Item[] }) {
           <Link href={n.href} className={MENU_ROW}>
             <n.icon size={20} aria-hidden="true" />
             {n.label}
+            {n.count ? <span className="ml-auto rounded-full bg-ink px-2 text-xs font-semibold leading-5 text-on-ink">{countText(n.count)}</span> : null}
           </Link>
         </li>
       ))}
@@ -123,11 +127,55 @@ const ALL = {
 } satisfies Record<string, Item>;
 
 /**
+ * True while the visitor is scrolling down the page (and not near the top).
+ * Scrolling up, or reaching the top, brings the bars back.
+ */
+function useScrollingDown(): [boolean, (v: boolean) => void] {
+  const [down, setDown] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    let ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - last;
+        // Ignore tiny movements so the bars don't flicker.
+        if (y < 64) setDown(false);
+        else if (delta > 8) setDown(true);
+        else if (delta < -8) setDown(false);
+        if (Math.abs(delta) > 8 || y < 64) last = y;
+        ticking = false;
+      });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return [down, setDown];
+}
+
+/**
  * Facebook / Instagram style navigation: a bar along the bottom on phones and a
  * sidebar on the left on bigger screens. The profile button is your own picture.
  */
-export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser | null; guest: boolean; unread: number; unreadMessages: number }) {
+export function AppNav({
+  user,
+  guest,
+  unread,
+  unreadMessages,
+  friendRequests = 0,
+}: {
+  user: NavUser | null;
+  guest: boolean;
+  unread: number;
+  unreadMessages: number;
+  friendRequests?: number;
+}) {
   const pathname = usePathname() ?? "/";
+  const [scrollingDown, setScrollingDown] = useScrollingDown();
+  // A new page always starts with the bars showing.
+  useEffect(() => setScrollingDown(false), [pathname, setScrollingDown]);
   if (!user && !guest) {
     return (
       <header className="sticky top-0 z-30 border-b border-line bg-bg">
@@ -143,18 +191,27 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
 
   const messages: Item = { href: "/messages", label: "Messages", icon: MessageCircle, count: unreadMessages };
   const notifications: Item = { href: "/notifications", label: "Notifications", icon: Bell, count: unread };
+  const friends: Item = { href: "/friends", label: "Friends", icon: Contact, count: friendRequests };
   const profileHref = user ? `/u/${user.username}` : "/login";
   const profileActive = !!user && isActive(pathname, profileHref);
 
   const sidebar: Item[] = user
-    ? [ALL.home, ALL.search, ALL.market, ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, messages, notifications, ALL.create]
+    ? [ALL.home, ALL.search, ALL.market, ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, friends, messages, notifications, ALL.create]
     : [ALL.home, ALL.search, ALL.market, ALL.tags, ALL.clubs, ALL.events];
   const sidebarMore: Item[] = user ? [ALL.leaderboard, ALL.settings, ...(user.isAdmin ? [ALL.admin] : [])] : [ALL.leaderboard];
 
   const bottom: Item[] = user ? [ALL.home, ALL.search, ALL.create, ALL.market] : [ALL.home, ALL.search, ALL.market, ALL.clubs];
   const phoneMore: Item[] = user
-    ? [ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, ALL.leaderboard, ALL.settings, ...(user.isAdmin ? [ALL.admin] : [])]
+    ? [friends, ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, ALL.leaderboard, ALL.settings, ...(user.isAdmin ? [ALL.admin] : [])]
     : [ALL.tags, ALL.events, ALL.leaderboard];
+
+  const everything: Item[] = [...bottom, ...sidebar, ...sidebarMore, ...phoneMore, messages, notifications];
+  const match = everything.filter((n) => isActive(pathname, n.href)).sort((a, b) => b.href.length - a.href.length)[0];
+  const current: { label: string; icon?: LucideIcon; avatar?: boolean } = profileActive
+    ? { label: "Profile", avatar: true }
+    : match
+      ? { label: match.label, icon: match.icon }
+      : { label: "Menu" };
 
   const profileAvatar = (size: number) =>
     user ? <Avatar userId={user.id} name={user.displayName ?? user.username} hasImage={user.hasAvatar} decorative size={size} /> : null;
@@ -188,7 +245,7 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
                       <Badge n={n.count} />
                     </span>
                     <span className="sr-only lg:not-sr-only">{n.label}</span>
-                    {n.count ? <span className="sr-only">{`, ${countText(n.count)} ${n.href === "/notifications" ? "unread" : "new"}`}</span> : null}
+                    {n.count ? <span className="sr-only">{`, ${countText(n.count)} ${n.href === "/notifications" ? "unread" : n.href === "/friends" ? "requests" : "new"}`}</span> : null}
                   </Link>
                 </li>
               );
@@ -201,7 +258,7 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
                   title="Profile"
                   className={`flex items-center justify-center gap-4 rounded px-3 py-2.5 text-ink hover:bg-surface hover:no-underline lg:justify-start ${profileActive ? "font-bold" : ""}`}
                 >
-                  <span className={`rounded-full ${profileActive ? "ring-2 ring-ink ring-offset-2 ring-offset-bg" : ""}`}>{profileAvatar(26)}</span>
+                  <span className={`inline-flex rounded-full ${profileActive ? "ring-2 ring-ink ring-offset-2 ring-offset-bg" : ""}`}>{profileAvatar(26)}</span>
                   <span className="sr-only lg:not-sr-only">Profile</span>
                 </Link>
               </li>
@@ -239,7 +296,11 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
       </aside>
 
       {/* Phones: a slim top bar with messages and notifications... */}
-      <header className="sticky top-0 z-30 border-b border-line bg-bg md:hidden">
+      <header
+        className={`sticky top-0 z-30 border-b border-line bg-bg transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden ${
+          scrollingDown ? "-translate-y-full" : "translate-y-0"
+        }`}
+      >
         <div className="flex items-center gap-1 px-4 py-2">
           <Logo />
           <div className="ml-auto flex items-center gap-1">
@@ -282,7 +343,12 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
       </header>
 
       {/* ...and the main pages along the bottom, with your picture as the profile button. */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav
+        aria-label="Main"
+        className={`fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden ${
+          scrollingDown ? "translate-y-full" : "translate-y-0"
+        }`}
+      >
         <ul className="grid grid-cols-5">
           {bottom.map((n) => {
             const active = isActive(pathname, n.href);
@@ -307,7 +373,7 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
                 aria-current={profileActive ? "page" : undefined}
                 className="flex h-14 items-center justify-center hover:no-underline"
               >
-                <span className={`rounded-full ${profileActive ? "ring-2 ring-ink ring-offset-2 ring-offset-bg" : ""}`}>{profileAvatar(28)}</span>
+                <span className={`inline-flex rounded-full ${profileActive ? "ring-2 ring-ink ring-offset-2 ring-offset-bg" : ""}`}>{profileAvatar(28)}</span>
               </Link>
             ) : (
               <a href="/login" aria-label="Sign in" className="flex h-14 items-center justify-center text-ink hover:no-underline">
@@ -317,6 +383,19 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
           </li>
         </ul>
       </nav>
+      {/* While scrolling down, only the current page's symbol stays; tap it to bring the bar back. */}
+      <button
+        type="button"
+        onClick={() => setScrollingDown(false)}
+        aria-label={`Show navigation (${current.label})`}
+        tabIndex={scrollingDown ? 0 : -1}
+        aria-hidden={!scrollingDown}
+        className={`fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg text-ink shadow-lg transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none md:hidden ${
+          scrollingDown ? "scale-100 opacity-100" : "pointer-events-none scale-75 opacity-0"
+        }`}
+      >
+        {current.avatar ? profileAvatar(30) : current.icon ? <current.icon size={24} strokeWidth={2.5} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
+      </button>
     </>
   );
 }

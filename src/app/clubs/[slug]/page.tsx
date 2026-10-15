@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { CleanTextarea } from "@/components/ui/clean-input";
 import { EmptyState } from "@/components/ui/empty";
-import { PostList } from "@/components/posts/post-card";
+import { Pagination, PostList } from "@/components/posts/post-card";
 import { ReportForm } from "@/components/report-form";
 import { ClubLogo } from "@/components/club-logo";
 import { formatDateTime } from "@/lib/dates";
@@ -24,9 +24,11 @@ const SOCIAL_URL: Record<string, (h: string) => string> = {
   website: (h) => h,
 };
 
-export default async function ClubPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ClubPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ show?: string; page?: string }> }) {
   const actor = await requireMember({ guestOk: true });
   const { slug } = await params;
+  const sp = await searchParams;
+  const officialOnly = sp.show === "official";
   let detail;
   try {
     detail = await getClub(actor, slug);
@@ -35,7 +37,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
     throw err;
   }
   const { club } = detail;
-  const [events, recent] = await Promise.all([clubUpcomingEvents(actor, club.id), clubRecentPosts(actor, club.id)]);
+  const [events, recent] = await Promise.all([clubUpcomingEvents(actor, club.id), clubRecentPosts(actor, club.id, { officialOnly, page: Number(sp.page ?? "1") || 1 })]);
   const path = `/clubs/${club.slug}`;
   const canManage = detail.isManager || actor.isAdmin;
 
@@ -81,7 +83,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
                   Post an event
                 </Link>
                 <Link href={`/posts/new?type=club&club=${club.id}`} className="btn btn-sm">
-                  Post an update
+                  Post an official update
                 </Link>
               </>
             )}
@@ -112,10 +114,34 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
       </section>
 
       <section className="mt-8" aria-labelledby="club-posts">
-        <h2 id="club-posts" className="mb-3 text-lg font-semibold">
-          Recent posts
-        </h2>
-        <PostList posts={recent} empty={<EmptyState title="No posts yet" />} />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="club-posts" className="text-lg font-semibold">
+            Posts
+          </h2>
+          {!actor.guest && (
+            <Link href={`/posts/new?type=discussion&club=${club.id}`} className="btn btn-sm">
+              Post in this club
+            </Link>
+          )}
+        </div>
+        <nav aria-label="Club posts" className="mb-4 flex gap-2">
+          <Link href={path} className={`btn btn-sm ${!officialOnly ? "btn-primary" : ""}`} aria-current={!officialOnly ? "page" : undefined}>
+            Everyone
+          </Link>
+          <Link href={`${path}?show=official`} className={`btn btn-sm ${officialOnly ? "btn-primary" : ""}`} aria-current={officialOnly ? "page" : undefined}>
+            Official
+          </Link>
+        </nav>
+        <PostList
+          posts={recent.items}
+          path={path}
+          empty={
+            <EmptyState title={officialOnly ? "No official posts yet" : "No posts yet"}>
+              {officialOnly ? "Updates from the club's managers appear here." : "Anyone can post in a club by tagging it."}
+            </EmptyState>
+          }
+        />
+        <Pagination page={recent.page} pages={recent.pages} makeHref={(p) => `${path}?${officialOnly ? "show=official&" : ""}page=${p}`} />
       </section>
 
       <section className="mt-8" aria-labelledby="club-managers">

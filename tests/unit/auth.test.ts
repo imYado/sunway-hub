@@ -32,6 +32,18 @@ describe.skipIf(!hasDb)("authentication", () => {
     expect(await startLogin("x@imail.sunway.edu.my.evil.com", nextIp())).toEqual({ step: "rejected" });
   });
 
+  it("rude made-up addresses get the usual response but no code is sent", async () => {
+    for (const email of ["fuck.you@imail.sunway.edu.my", "bigdick69@imail.sunway.edu.my"]) {
+      expect(await startLogin(email, nextIp())).toMatchObject({ step: "code", purpose: "login" });
+      expect(await db.select().from(otpCodes).where(eq(otpCodes.email, email))).toHaveLength(0);
+    }
+    // Ordinary names that merely contain letters of a bad word still get a code.
+    for (const email of ["cassandra.lee@imail.sunway.edu.my", "21012345@imail.sunway.edu.my", "scunthorpe@sunway.edu.my"]) {
+      await startLogin(email, nextIp());
+      expect(await db.select().from(otpCodes).where(eq(otpCodes.email, email))).toHaveLength(1);
+    }
+  });
+
   it("member sign-in: code is single use and creates an active 30-day session", async () => {
     const email = "newstudent@imail.sunway.edu.my";
     const step = await startLogin(email, nextIp());

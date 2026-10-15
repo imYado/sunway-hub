@@ -71,6 +71,13 @@
       "when": 1792063318129,
       "tag": "0009_unverified_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792084936824,
+      "tag": "0010_friendships",
+      "breakpoints": true
     }
   ]
 }

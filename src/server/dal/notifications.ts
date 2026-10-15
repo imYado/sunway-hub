@@ -5,7 +5,7 @@ import { clubFollows, notificationSettings, notifications, postSubjects, subject
 import type { Actor } from "../actor-types";
 
 /** "reply" (comments and replies) and "message" (private messages) are in-app only, never emailed. */
-export type NotificationKind = "decision" | "followed" | "reminder" | "system" | "reply" | "message";
+export type NotificationKind = "decision" | "followed" | "reminder" | "system" | "reply" | "message" | "friend";
 
 export interface NotifyInput {
   kind: NotificationKind;

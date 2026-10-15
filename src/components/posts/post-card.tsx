@@ -80,8 +80,8 @@ export function PostCard({ post, showStatus = false, path }: { post: PostCardDat
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2 text-sm">
-          <span className="badge">
-            {POST_TYPE_LABEL[post.type]}
+          <span className={`badge ${post.type === "club" ? "border-ink font-semibold" : ""}`}>
+            {post.type === "club" ? "Official" : POST_TYPE_LABEL[post.type]}
             {post.marketKind && ` · ${MARKET_KIND_LABEL[post.marketKind]}`}
           </span>
           {showStatus && <StatusBadge status={post.status} />}

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/db";
@@ -430,4 +430,36 @@ export async function hasApprovedAvatar(userId: string): Promise<boolean> {
     .where(eq(userAvatars.userId, userId))
     .limit(1);
   return !!row?.id;
+}
+
+export interface UserResult {
+  id: string;
+  username: string;
+  displayName: string | null;
+  hasAvatar: boolean;
+}
+
+/** People search: matches the username only, never names or email addresses. */
+export async function searchUsers(actor: Actor, raw: string, limit = 20): Promise<UserResult[]> {
+  const q = raw.trim().replace(/^@/, "").toLowerCase().slice(0, 40);
+  if (!q) return [];
+  const like = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
+  const rows = await db
+    .select({ id: users.id, username: users.username, displayName: users.displayName, avatar: userAvatars.approvedFileId })
+    .from(users)
+    .leftJoin(userAvatars, eq(userAvatars.userId, users.id))
+    .where(
+      and(
+        ilike(users.username, like),
+        eq(users.status, "active"),
+        eq(users.hiddenByReports, false),
+        isNotNull(users.onboardedAt),
+        isNotNull(users.username),
+      ),
+    )
+    // Exact and starts-with matches first, then the rest alphabetically.
+    .orderBy(sql`case when ${users.username} = ${q} then 0 when ${users.username} like ${q.replace(/[%_\\]/g, "\\$&") + "%"} then 1 else 2 end`, asc(users.username))
+    .limit(Math.min(50, limit));
+  void actor;
+  return rows.map((r) => ({ id: r.id, username: r.username as string, displayName: r.displayName, hasAvatar: !!r.avatar }));
 }

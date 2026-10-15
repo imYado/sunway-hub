@@ -91,7 +91,7 @@ describe.skipIf(!hasDb)("market and private messages", () => {
     const postId = await approved(alice, { type: "market", marketKind: "borrow", title: "Can lend a lab coat", anonymous: true });
     const { id } = await startConversation(carol, { postId, body: "Could I borrow it on Friday?" });
     let view = await getConversation(carol, id);
-    expect(view.other).toEqual({ id: null, username: null, name: "Anonymous poster", anonymous: true, deleted: false });
+    expect(view.other).toEqual({ id: null, username: null, name: "Anonymous poster", anonymous: true, deleted: false, hasAvatar: false });
     expect(JSON.stringify(view)).not.toContain(alice.id);
     expect(JSON.stringify(await listConversations(carol))).not.toContain(alice.id);
     // The poster sees who is asking.

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { adminCredentials, notificationSettings, sessions, users } from "@/db/schema";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
-import { classifyEmail, isAdminEmail, normaliseEmail } from "@/lib/email-domain";
+import { classifyEmail, emailDomain, isAdminEmail, normaliseEmail } from "@/lib/email-domain";
 import { env } from "@/lib/env";
 import { formatDate } from "@/lib/dates";
 import { isAcceptablePassword } from "@/lib/password-strength";
@@ -13,6 +13,7 @@ import { issueOtp, verifyOtp, type OtpPurpose } from "./otp";
 import { dummyVerify, hashPassword, verifyPassword } from "./password";
 import { createSessionRecord, setSessionStage, type LoadedSession } from "./session";
 import { audit } from "../audit";
+import { getServerFilter } from "../profanity";
 import { verifyTotp } from "./totp";
 
 export const REJECTED_MESSAGE = "Only Sunway email addresses can sign in.";
@@ -53,8 +54,22 @@ export async function startLogin(rawEmail: string, ipKey: string): Promise<Login
     // Same response as everyone else; the code simply never arrives.
     return { step: "code", email, purpose: "login" };
   }
+  if (await isOffensiveAddress(email)) {
+    // Made-up rude addresses get the same response, but no email is sent, so
+    // nothing bounces back into the admin's inbox.
+    await audit(null, "login.offensive_email_blocked", { type: "email", id: emailDomain(email) ?? "" });
+    return { step: "code", email, purpose: "login" };
+  }
   await issueOtp(email, "login");
   return { step: "code", email, purpose: "login" };
+}
+
+/** True when the part before the @ contains blocked language (checked word by word and as one string). */
+export async function isOffensiveAddress(email: string): Promise<boolean> {
+  const local = email.split("@")[0] ?? "";
+  if (!local) return false;
+  const filter = await getServerFilter();
+  return filter.check(local.replace(/[._+-]+/g, " ")) || filter.check(local.replace(/[._+-]+/g, ""));
 }
 
 export async function requestAdminReset(rawEmail: string, ipKey: string): Promise<void> {

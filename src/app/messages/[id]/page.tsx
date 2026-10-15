@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { AutoRefresh } from "@/components/messages/auto-refresh";
 import { MessageComposer } from "@/components/messages/composer";
-import { DmPrivacyNote } from "@/components/messages/privacy-note";
+import { ChatNotice, PrivacyChatNotice } from "@/components/messages/chat-notice";
+import { Avatar } from "@/components/ui/avatar";
+import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import { ReportForm } from "@/components/report-form";
 import { formatDateTime } from "@/lib/dates";
 import { env } from "@/lib/env";
@@ -38,117 +40,144 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     throw err;
   }
   const pendingForMe = c.status === "pending" && c.role === "recipient";
+  const pendingFromMe = c.status === "pending" && c.role === "starter";
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto flex max-w-2xl flex-col">
       <AutoRefresh seconds={15} />
-      <p className="mb-2 text-sm">
-        <Link href="/messages">Back to messages</Link>
-      </p>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold">
+      <header className="mb-2 flex items-center gap-3 border-b border-line pb-3">
+        <Link href="/messages" aria-label="Back to messages" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink hover:bg-surface">
+          <ArrowLeft size={22} aria-hidden="true" />
+        </Link>
+        <Avatar userId={c.other.id ?? ""} name={c.other.name} hasImage={c.other.hasAvatar} anonymous={c.other.anonymous || !c.other.id} decorative size={40} />
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-semibold">
             {c.other.username ? <Link href={`/u/${c.other.username}`}>{c.other.name}</Link> : c.other.name}
           </h1>
-          {c.postTitle && (
-            <p className="text-sm text-muted">
-              About {c.postId ? <Link href={`/posts/${c.postId}`}>{c.postTitle}</Link> : c.postTitle}
+          {c.other.username && (
+            <p className="truncate text-sm text-muted">
+              @{c.other.username}
+              {c.friends && " · Friends"}
             </p>
           )}
-          {c.iAmHidden && <p className="text-sm text-muted">You&apos;re anonymous here: they can&apos;t see your name.</p>}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {c.iAmHidden && c.status === "accepted" && (
-            <Op id={c.id} op="reveal" label="Show my name" confirm="They will see your name and profile. This can't be undone." />
-          )}
-          {c.status === "blocked" ? (
-            c.blockedByMe && <Op id={c.id} op="unblock" label="Unblock" />
-          ) : (
-            c.status !== "declined" && <Op id={c.id} op="block" label="Block" variant="danger" confirm="Block this conversation? Neither of you can send messages until you unblock it." />
-          )}
-          {c.other.id && <ReportForm targetType="user" targetId={c.other.id} className="" label="Report person" />}
-        </div>
-      </div>
-
-      {pendingForMe && (
-        <div className="surface mb-4 p-4">
-          <p className="font-medium">{c.other.name} wants to message you.</p>
-          <p className="mb-3 text-sm text-muted">
-            {c.iAmHidden
-              ? "You posted anonymously. Accepting keeps your name hidden unless you choose to show it."
-              : "If you accept, you can message each other and send images."}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {(["accept", ...(c.iAmHidden ? ["accept_reveal"] : []), "decline"] as const).map((op) => (
-              <ActionForm key={op} action={respondAction}>
-                <input type="hidden" name="conversationId" value={c.id} />
-                <input type="hidden" name="op" value={op} />
-                <SubmitButton variant={op === "decline" ? "danger" : "primary"} size="sm">
-                  {op === "accept" ? (c.iAmHidden ? "Accept and stay anonymous" : "Accept") : op === "accept_reveal" ? "Accept and show my name" : "Decline"}
-                </SubmitButton>
-              </ActionForm>
-            ))}
+        <details className="relative" data-popup>
+          <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full text-ink hover:bg-surface" aria-label="Conversation options">
+            <MoreHorizontal size={22} aria-hidden="true" />
+          </summary>
+          <div className="absolute right-0 z-40 mt-2 flex w-64 flex-col gap-2 rounded border border-line bg-bg p-3 text-sm shadow-lg">
+            {c.iAmHidden && c.status === "accepted" && (
+              <Op id={c.id} op="reveal" label="Show my name" confirm="They will see your name and profile. This can't be undone." />
+            )}
+            {c.status === "blocked" ? (
+              c.blockedByMe && <Op id={c.id} op="unblock" label="Unblock" />
+            ) : (
+              c.status !== "declined" && <Op id={c.id} op="block" label="Block" variant="danger" confirm="Block this conversation? Neither of you can send messages until you unblock it." />
+            )}
+            {c.other.id && <ReportForm targetType="user" targetId={c.other.id} className="" label="Report person" />}
           </div>
-        </div>
-      )}
+        </details>
+      </header>
 
-      <ol className="space-y-3" aria-label="Messages">
-        {c.messages.map((m) => (
-          <li key={m.id} id={`m-${m.id}`} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] rounded border border-line p-3 ${m.mine ? "bg-surface" : "bg-bg"}`}>
-              <p className="mb-1 text-xs text-muted">
-                {m.mine ? "You" : c.other.name} · {formatDateTime(m.createdAt)}
-              </p>
-              {m.deleted ? (
-                <p className="text-sm italic text-muted">Message removed</p>
-              ) : (
-                <>
-                  {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
-                  {m.files.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {m.files.map((f) => (
-                        <a key={f.id} href={`/api/files/dm/${f.id}`} target="_blank" rel="noopener">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- private, decrypted per request */}
-                          <img
-                            src={`/api/files/dm/${f.id}`}
-                            alt={f.name}
-                            width={f.width ?? undefined}
-                            height={f.height ?? undefined}
-                            className="max-h-64 w-auto rounded border border-line"
-                            loading="lazy"
-                          />
-                        </a>
-                      ))}
+      <div className="flex-1 py-2">
+        {c.postTitle && (
+          <ChatNotice title="About a post">{c.postId ? <Link href={`/posts/${c.postId}`}>{c.postTitle}</Link> : c.postTitle}</ChatNotice>
+        )}
+        {c.iAmHidden && <ChatNotice>You&apos;re anonymous here: they can&apos;t see your name.</ChatNotice>}
+        <PrivacyChatNotice />
+
+        <ol className="mt-4 space-y-1" aria-label="Messages">
+          {c.messages.map((m, i) => {
+            const next = c.messages[i + 1];
+            const lastInRun = !next || next.mine !== m.mine;
+            return (
+              <li key={m.id} id={`m-${m.id}`} className={`flex items-end gap-2 ${m.mine ? "justify-end" : "justify-start"} ${lastInRun ? "mb-3" : ""}`}>
+                {!m.mine && (
+                  <span className={`shrink-0 ${lastInRun ? "" : "invisible"}`}>
+                    <Avatar userId={c.other.id ?? ""} name={c.other.name} hasImage={c.other.hasAvatar} anonymous={c.other.anonymous || !c.other.id} decorative size={28} />
+                  </span>
+                )}
+                <div className={`group flex max-w-[78%] flex-col ${m.mine ? "items-end" : "items-start"}`}>
+                  <span className="sr-only">{m.mine ? "You" : c.other.name}:</span>
+                  {m.deleted ? (
+                    <p className="rounded-[22px] border border-line px-4 py-2 text-sm italic text-muted">Message removed</p>
+                  ) : (
+                    <>
+                      {m.body && (
+                        <p className={`whitespace-pre-wrap break-words rounded-[22px] px-4 py-2 ${m.mine ? "bg-ink text-on-ink" : "bg-surface text-ink"}`}>{m.body}</p>
+                      )}
+                      {m.files.length > 0 && (
+                        <div className={`mt-1 flex flex-wrap gap-1 ${m.mine ? "justify-end" : ""}`}>
+                          {m.files.map((f) => (
+                            <a key={f.id} href={`/api/files/dm/${f.id}`} target="_blank" rel="noopener">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- private, decrypted per request */}
+                              <img
+                                src={`/api/files/dm/${f.id}`}
+                                alt={f.name}
+                                width={f.width ?? undefined}
+                                height={f.height ?? undefined}
+                                className="max-h-64 w-auto rounded-[16px] border border-line"
+                                loading="lazy"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {lastInRun && <span className="mt-1 px-2 text-xs text-muted">{formatDateTime(m.createdAt)}</span>}
+                  {!m.deleted && (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {m.mine ? (
+                        <ActionForm action={deleteMessageAction} confirm="Remove this message for both of you?">
+                          <input type="hidden" name="messageId" value={m.id} />
+                          <button type="submit" className="px-2 text-xs text-muted underline-offset-2 hover:underline">
+                            Remove
+                          </button>
+                        </ActionForm>
+                      ) : (
+                        <ReportForm targetType="message" targetId={m.id} className="text-xs" />
+                      )}
                     </div>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {m.mine ? (
-                      <ActionForm action={deleteMessageAction} confirm="Remove this message for both of you?">
-                        <input type="hidden" name="messageId" value={m.id} />
-                        <SubmitButton size="sm">Remove</SubmitButton>
-                      </ActionForm>
-                    ) : (
-                      <ReportForm targetType="message" targetId={m.id} className="" />
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
 
-      <div className="mt-6">
+        {pendingForMe && (
+          <ChatNotice title={`${c.other.name} wants to message you`}>
+            <p>
+              {c.iAmHidden
+                ? "You posted anonymously. Accepting keeps your name hidden unless you choose to show it."
+                : c.friends
+                  ? "You're friends. Accept to reply."
+                  : "You're not friends. If you accept, you can message each other and send images. They won't know you've seen this unless you accept."}
+            </p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {(["accept", ...(c.iAmHidden ? ["accept_reveal"] : []), "decline"] as const).map((op) => (
+                <ActionForm key={op} action={respondAction}>
+                  <input type="hidden" name="conversationId" value={c.id} />
+                  <input type="hidden" name="op" value={op} />
+                  <SubmitButton variant={op === "decline" ? "danger" : "primary"} size="sm">
+                    {op === "accept" ? (c.iAmHidden ? "Accept and stay anonymous" : "Accept") : op === "accept_reveal" ? "Accept and show my name" : "Decline"}
+                  </SubmitButton>
+                </ActionForm>
+              ))}
+            </div>
+          </ChatNotice>
+        )}
+      </div>
+
+      <div className="mt-2">
         {c.canSend ? (
-          <>
-            <DmPrivacyNote />
-            <MessageComposer conversationId={c.id} userId={actor.id} storageDriver={env.storageDriver} />
-          </>
-        ) : c.status === "pending" && c.role === "starter" ? (
-          <p className="surface p-3 text-sm text-muted">Your request was sent. You can send more once they accept.</p>
+          <MessageComposer conversationId={c.id} userId={actor.id} storageDriver={env.storageDriver} />
+        ) : pendingFromMe ? (
+          <p className="rounded-[22px] border border-line p-3 text-center text-sm text-muted">Your request was sent. {c.other.name} will only see it if they accept, and you can send more once they do.</p>
         ) : c.status === "declined" ? (
-          <p className="surface p-3 text-sm text-muted">They declined your request.</p>
+          <p className="rounded-[22px] border border-line p-3 text-center text-sm text-muted">They declined your request.</p>
         ) : c.status === "blocked" ? (
-          <p className="surface p-3 text-sm text-muted">This conversation is blocked.</p>
+          <p className="rounded-[22px] border border-line p-3 text-center text-sm text-muted">This conversation is blocked.</p>
         ) : null}
       </div>
     </div>
