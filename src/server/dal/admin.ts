@@ -363,7 +363,15 @@ export async function getUserForAdmin(actor: Actor, userId: string) {
     .orderBy(desc(reports.createdAt))
     .limit(50);
   const identity = u.status === "deleted" ? await identityForAdmin(u.id) : null;
-  return { user: u, identity, posts: userPosts, avatar: avatar ?? null, reports: reportsAgainst, isAdminAccount: u.email === env.adminEmail };
+  // Before verifying, the admin should know if someone else already has or claims this Sunway address.
+  const claimConflicts = u.claimedSunwayEmail
+    ? await db
+        .select({ id: users.id, username: users.username, email: users.email })
+        .from(users)
+        .where(and(or(eq(users.email, u.claimedSunwayEmail), eq(users.claimedSunwayEmail, u.claimedSunwayEmail)), sql`${users.id} <> ${u.id}`))
+        .limit(10)
+    : [];
+  return { user: u, identity, claimConflicts, posts: userPosts, avatar: avatar ?? null, reports: reportsAgainst, isAdminAccount: u.email === env.adminEmail };
 }
 
 async function loadTarget(userId: string) {

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { otpCodes } from "@/db/schema";
 import { generateOtp, hashOtp, safeEqualHex } from "@/lib/crypto";
@@ -54,10 +54,14 @@ export async function verifyOtp(email: string, purpose: OtpPurpose, code: string
   if (!row) return false;
   if (row.expiresAt.getTime() <= Date.now() || row.attempts >= OTP_MAX_ATTEMPTS) return false;
   const ok = safeEqualHex(row.codeHash, hashOtp(env.otpPepper, email, purpose, code));
-  if (!ok) {
-    await db.update(otpCodes).set({ attempts: row.attempts + 1 }).where(eq(otpCodes.id, row.id));
-    return false;
-  }
+  // Count the attempt atomically before trusting the result, so parallel guesses
+  // can't all read the same count and get more than OTP_MAX_ATTEMPTS tries.
+  const counted = await db
+    .update(otpCodes)
+    .set({ attempts: sql`${otpCodes.attempts} + 1` })
+    .where(and(eq(otpCodes.id, row.id), isNull(otpCodes.consumedAt), lt(otpCodes.attempts, OTP_MAX_ATTEMPTS)))
+    .returning({ attempts: otpCodes.attempts });
+  if (counted.length !== 1 || !ok) return false;
   // Consume atomically so a code can never be used twice.
   const consumed = await db
     .update(otpCodes)

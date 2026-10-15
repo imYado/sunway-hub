@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIp } from "../request";
 import { assertSunwayVerified } from "./verification";
 import { and, asc, count, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -398,7 +399,8 @@ export interface SearchFilters {
 }
 
 export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ items: PostCard[]; total: number; page: number; pages: number }> {
-  if (f.q) await enforce("search", actor.id, LIMITS.searchPerUser.limit, LIMITS.searchPerUser.window);
+  // Guests all share one id, so limit them per IP instead.
+  if (f.q) await enforce("search", actor.guest ? `guest:${await clientIp()}` : actor.id, LIMITS.searchPerUser.limit, LIMITS.searchPerUser.window);
   const page = Math.max(1, Math.min(500, Math.floor(f.page ?? 1)));
   const conds: SQL[] = [publicCondition()];
   const q = f.q?.trim().slice(0, 100);

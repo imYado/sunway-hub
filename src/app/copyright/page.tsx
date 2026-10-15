@@ -20,7 +20,7 @@ export default async function CopyrightPage() {
           form below or email <a href="mailto:hubsunway@gmail.com">hubsunway@gmail.com</a>.
         </p>
         <ul className="list-disc space-y-1 pl-6">
-          <li>When a request names a post on this site, the post is hidden immediately while we review it.</li>
+          <li>When a signed-in member sends a request about a post on this site, the post is hidden straight away while we review it. Other requests are reviewed by the admin.</li>
           <li>Our target is to review and remove infringing content within 48 hours.</li>
           <li>We may contact the member who posted it and may suspend repeat infringers.</li>
           <li>If you posted the content and believe it was removed by mistake, email us with the details.</li>

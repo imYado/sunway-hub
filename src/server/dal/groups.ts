@@ -171,6 +171,8 @@ export async function removeMember(actor: Actor, id: string, userId: string) {
   if (userId === actor.id) throw new AppError("Use Leave group instead.");
   if (!(await isMember(g.id, userId))) return;
   await removeFromGroup(g, userId, actor.id);
+  // A new invite code, or the removed member could simply rejoin with the old one.
+  await db.update(studyGroups).set({ inviteCode: newInviteCode() }).where(eq(studyGroups.id, g.id));
   await notify([userId], { kind: "system", title: `You were removed from the study group "${g.name}"` });
 }
 

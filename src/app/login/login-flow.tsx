@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { PasswordMeter } from "@/components/auth/password-meter";
 import { isAcceptablePassword } from "@/lib/password-strength";
+import { safeNext } from "@/lib/safe-next";
 import type { OtpPurpose } from "@/server/auth/otp";
 import {
   continueAsGuestAction,
@@ -21,9 +22,6 @@ import {
 
 type Step = "email" | "code" | "other_email" | "other_code" | "password" | "create_password" | "totp";
 
-function safeNext(next: string | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
 
 export function LoginFlow({
   initialStep,

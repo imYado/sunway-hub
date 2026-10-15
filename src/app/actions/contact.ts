@@ -22,9 +22,8 @@ export async function contactAction(_: ActionState, fd: FormData): Promise<Actio
       await clientIp(),
     );
     if (kind === "takedown") {
-      return r.hidden
-        ? "Thank you. The content has been hidden while the admin reviews your request (target: within 48 hours)."
-        : "Thank you. The admin will review your request within 48 hours.";
+      void r;
+      return "Thank you. The admin will review your request within 48 hours.";
     }
     return "Thank you. Your message has been sent.";
   });

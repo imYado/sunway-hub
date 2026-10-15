@@ -72,7 +72,8 @@ export async function startOtherEmailLogin(rawSunwayEmail: string, rawOtherEmail
   if (!isAllowedMemberEmail(sunwayEmail, env.allowedEmailDomains)) throw new AppError(REJECTED_MESSAGE);
   if (!isValidEmailShape(email)) throw new AppError(OTHER_EMAIL_INVALID);
   if (classifyEmail(email, emailOpts()) === "member") throw new AppError(OTHER_EMAIL_IS_SUNWAY);
-  await enforce("code-email", email, LIMITS.codeRequestPerEmail.limit, LIMITS.codeRequestPerEmail.window);
+  await enforce("other-ip", ipKey, LIMITS.otherEmailPerIp.limit, LIMITS.otherEmailPerIp.window);
+  await enforce("other-email", email, LIMITS.otherEmailPerEmail.limit, LIMITS.otherEmailPerEmail.window);
   // The admin account never signs in this way; it gets the same response but no code.
   if (isAdminEmail(email, env.adminEmail)) return { email };
   const [user] = await db.select({ status: users.status }).from(users).where(eq(users.email, email)).limit(1);
@@ -90,6 +91,7 @@ export async function verifyOtherEmailCode(
   const sunwayEmail = normaliseEmail(rawSunwayEmail);
   const email = normaliseEmail(rawOtherEmail);
   await enforce("verify-ip", ipKey, LIMITS.codeVerifyPerIp.limit, LIMITS.codeVerifyPerIp.window);
+  await enforce("verify-email", email, LIMITS.codeVerifyPerEmail.limit, LIMITS.codeVerifyPerEmail.window);
   if (!isAllowedMemberEmail(sunwayEmail, env.allowedEmailDomains)) throw new AppError(BAD_CODE_MESSAGE);
   if (classifyEmail(email, emailOpts()) !== "rejected" || !isValidEmailShape(email)) throw new AppError(BAD_CODE_MESSAGE);
   if (!(await verifyOtp(email, "login_other", code))) throw new AppError(BAD_CODE_MESSAGE);
@@ -167,6 +169,7 @@ export async function verifyLoginCode(
 ): Promise<NewSession> {
   const email = normaliseEmail(rawEmail);
   await enforce("verify-ip", ipKey, LIMITS.codeVerifyPerIp.limit, LIMITS.codeVerifyPerIp.window);
+  await enforce("verify-email", email, LIMITS.codeVerifyPerEmail.limit, LIMITS.codeVerifyPerEmail.window);
   const kind = classifyEmail(email, emailOpts());
   if (kind === "rejected") throw new AppError(BAD_CODE_MESSAGE);
   if (kind === "member" && purpose !== "login") throw new AppError(BAD_CODE_MESSAGE);
@@ -190,11 +193,14 @@ export async function verifyLoginCode(
 export async function adminPasswordLogin(rawEmail: string, password: string, ipKey: string, ctx: SessionContext = {}): Promise<NewSession> {
   const email = normaliseEmail(rawEmail);
   await enforce("pw-ip", ipKey, LIMITS.passwordPerIp.limit, LIMITS.passwordPerIp.window);
-  await enforce("pw-account", "admin", LIMITS.passwordPerAccount.limit, LIMITS.passwordPerAccount.window);
   if (!isAdminEmail(email, env.adminEmail)) {
     await dummyVerify(password);
     throw new AppError(BAD_PASSWORD_MESSAGE);
   }
+  // Per account *and* IP, so a stranger can't lock the admin out; plus a high overall
+  // ceiling. The password itself (12+ characters, argon2) makes spread-out guessing hopeless.
+  await enforce("pw-account", `admin:${ipKey}`, LIMITS.passwordPerAccount.limit, LIMITS.passwordPerAccount.window);
+  await enforce("pw-account-all", "admin", LIMITS.passwordPerAccountTotal.limit, LIMITS.passwordPerAccountTotal.window);
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   const [creds] = user ? await db.select().from(adminCredentials).where(eq(adminCredentials.userId, user.id)).limit(1) : [];
   if (!user || !creds) {

@@ -360,6 +360,8 @@ export async function changePasswordAction(_: ActionState, fd: FormData): Promis
 export async function enableTotpAction(_: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
     const a = await admin();
+    // Replacing two-factor is as sensitive as turning it off.
+    requireRecentAuth(a);
     const secret = decryptSecret(env.sessionSecret, str(fd, "secret"));
     if (!(await enableTotp(a.id, secret, str(fd, "code").replace(/\s+/g, "")))) throw new AppError("That code did not match. Try the current code.");
     await audit(a, "admin.totp_enabled");

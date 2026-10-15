@@ -1,4 +1,5 @@
 import "server-only";
+import { isSunwayVerified } from "./verification";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -41,9 +42,16 @@ export async function submitContact(actor: Actor | null, raw: z.input<typeof con
   if (input.kind === "takedown") {
     if (!input.contentUrl) throw new AppError("Add the link to the content you want removed.");
     const id = postIdFromUrl(input.contentUrl);
-    if (id) {
-      const [p] = await db.select({ id: posts.id }).from(posts).where(eq(posts.id, id)).limit(1);
-      if (p) {
+    // Only signed-in, verified members can hide a post straight away; anyone else's
+    // request waits for the admin, or a stranger could hide any post.
+    if (id && actor && !actor.guest && (await isSunwayVerified(actor.id))) {
+      const [p] = await db
+        .select({ id: posts.id, authorEmail: users.email })
+        .from(posts)
+        .innerJoin(users, eq(users.id, posts.authorId))
+        .where(eq(posts.id, id))
+        .limit(1);
+      if (p && p.authorEmail !== env.adminEmail) {
         await db.update(posts).set({ hiddenByReports: true }).where(eq(posts.id, id));
         hiddenPostId = id;
         await audit(null, "post.hidden_by_takedown", { type: "post", id });
