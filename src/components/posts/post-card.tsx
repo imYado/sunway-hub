@@ -3,6 +3,7 @@ import { CalendarDays, FileText, Link2, MessageSquare } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { MARKET_KIND_LABEL, POST_TYPE_LABEL } from "@/lib/rules";
 import type { PostCard as PostCardData } from "@/server/dal/posts";
+import { Avatar } from "@/components/ui/avatar";
 import { VoteControl } from "./vote-control";
 
 export function StatusBadge({ status }: { status: PostCardData["status"] }) {
@@ -48,60 +49,91 @@ export function PostTags({ post }: { post: Pick<PostCardData, "subjects" | "club
   );
 }
 
+/** The poster's picture: their photo, a coloured initial, or grey for anonymous posts. */
+export function AuthorAvatar({ author, size = 40 }: { author: PostCardData["author"]; size?: number }) {
+  const masked = author.anonymous && !author.id;
+  return (
+    <Avatar
+      userId={author.id}
+      name={author.displayName ?? author.username}
+      hasImage={author.hasAvatar}
+      anonymous={masked}
+      decorative
+      size={size}
+    />
+  );
+}
+
 export function PostCard({ post, showStatus = false, path }: { post: PostCardData; showStatus?: boolean; path?: string }) {
   const votable = post.status === "approved" && !post.hiddenByReports && !post.deletedAt;
   return (
-    <article className="card flex gap-3 p-4">
-      <VoteControl kind="post" id={post.id} postId={post.id} score={post.score} vote={post.viewerVote} canVote={votable && !post.viewerIsAuthor} path={path} />
-      <div className="min-w-0 flex-1">
-        <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+    <article className="card p-4">
+      <header className="flex items-start gap-3">
+        <AuthorAvatar author={post.author} />
+        <div className="min-w-0 flex-1 text-sm">
+          <div className="font-medium">
+            <AuthorName author={post.author} />
+          </div>
+          <div className="text-muted">
+            {formatDate(post.createdAt)}
+            {post.editedAt && " (edited)"}
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 text-sm">
           <span className="badge">
             {POST_TYPE_LABEL[post.type]}
             {post.marketKind && ` · ${MARKET_KIND_LABEL[post.marketKind]}`}
           </span>
           {showStatus && <StatusBadge status={post.status} />}
           {post.hiddenByReports && <span className="badge text-danger">Hidden while under review</span>}
-          <AuthorName author={post.author} />
-          <span>{formatDate(post.createdAt)}</span>
-          {post.editedAt && <span>(edited)</span>}
         </div>
-        <h2 className="text-lg font-semibold break-words">
-          <Link href={`/posts/${post.id}`} className="text-ink">
-            {post.title}
-          </Link>
-        </h2>
-        {post.event && (
-          <p className="mt-1 flex items-center gap-2 text-sm">
-            <CalendarDays size={16} aria-hidden="true" />
-            {formatDateTime(post.event.startsAt)} · {post.event.location}
-          </p>
+      </header>
+      <h2 className="mt-3 text-lg font-semibold break-words">
+        <Link href={`/posts/${post.id}`} className="text-ink">
+          {post.title}
+        </Link>
+      </h2>
+      {post.event && (
+        <p className="mt-1 flex items-center gap-2 text-sm">
+          <CalendarDays size={16} aria-hidden="true" />
+          {formatDateTime(post.event.startsAt)} · {post.event.location}
+        </p>
+      )}
+      {post.description && <p className="mt-2 line-clamp-3 text-sm text-muted break-words">{post.description}</p>}
+      {showStatus && post.decisionReason && post.status !== "approved" && (
+        <p className="mt-2 text-sm text-danger">Admin note: {post.decisionReason}</p>
+      )}
+      <div className="mt-3">
+        <PostTags post={post} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2 text-sm text-muted">
+        <VoteControl
+          kind="post"
+          id={post.id}
+          postId={post.id}
+          score={post.score}
+          vote={post.viewerVote}
+          canVote={votable && !post.viewerIsAuthor}
+          path={path}
+          layout="row"
+        />
+        <Link href={`/posts/${post.id}#comments`} className="flex items-center gap-1 text-muted">
+          <MessageSquare size={14} aria-hidden="true" />
+          {post.commentCount} comment{post.commentCount === 1 ? "" : "s"}
+        </Link>
+        {post.semester && <span>{post.semester}</span>}
+        {post.fileCount > 0 && (
+          <span className="flex items-center gap-1">
+            <FileText size={14} aria-hidden="true" />
+            {post.fileCount} file{post.fileCount === 1 ? "" : "s"}
+          </span>
         )}
-        {post.description && <p className="mt-2 line-clamp-3 text-sm text-muted break-words">{post.description}</p>}
-        {showStatus && post.decisionReason && post.status !== "approved" && (
-          <p className="mt-2 text-sm text-danger">Admin note: {post.decisionReason}</p>
+        {post.links.length > 0 && (
+          <span className="flex items-center gap-1">
+            <Link2 size={14} aria-hidden="true" />
+            {post.links.length} link{post.links.length === 1 ? "" : "s"}
+          </span>
         )}
-        <div className="mt-3">
-          <PostTags post={post} />
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
-          <Link href={`/posts/${post.id}#comments`} className="flex items-center gap-1 text-muted">
-            <MessageSquare size={14} aria-hidden="true" />
-            {post.commentCount} comment{post.commentCount === 1 ? "" : "s"}
-          </Link>
-          {post.semester && <span>{post.semester}</span>}
-          {post.fileCount > 0 && (
-            <span className="flex items-center gap-1">
-              <FileText size={14} aria-hidden="true" />
-              {post.fileCount} file{post.fileCount === 1 ? "" : "s"}
-            </span>
-          )}
-          {post.links.length > 0 && (
-            <span className="flex items-center gap-1">
-              <Link2 size={14} aria-hidden="true" />
-              {post.links.length} link{post.links.length === 1 ? "" : "s"}
-            </span>
-          )}
-        </div>
       </div>
     </article>
   );

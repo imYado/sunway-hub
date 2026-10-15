@@ -421,3 +421,13 @@ export async function deleteMyAccount(actor: Actor, code: string, mode: "delete_
   if (!ok) throw new AppError("That code is incorrect or has expired.");
   await eraseUser(actor.id, mode, actor);
 }
+
+/** Whether the user has an approved profile picture (for the profile button in the navigation). */
+export async function hasApprovedAvatar(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: userAvatars.approvedFileId })
+    .from(userAvatars)
+    .where(eq(userAvatars.userId, userId))
+    .limit(1);
+  return !!row?.id;
+}

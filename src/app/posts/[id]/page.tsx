@@ -8,7 +8,7 @@ import { CommentComposer } from "@/components/comments/comment-composer";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { VoteControl } from "@/components/posts/vote-control";
 import { CopyLinkButton } from "@/components/ui/copy-link";
-import { AuthorName, PostTags, StatusBadge } from "@/components/posts/post-card";
+import { AuthorAvatar, AuthorName, PostTags, StatusBadge } from "@/components/posts/post-card";
 import { PostLinks } from "@/components/posts/post-links";
 import { ReportForm } from "@/components/report-form";
 import { formatDate, formatDateTime } from "@/lib/dates";
@@ -74,11 +74,18 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         <VoteControl kind="post" id={post.id} postId={post.id} score={post.score} vote={post.viewerVote} canVote={v.canInteract && !v.isOwner} />
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold break-words">{post.title}</h1>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-            <AuthorName author={post.author} />
-            <span>{formatDate(post.createdAt)}</span>
-            {post.editedAt && <span>(edited {formatDate(post.editedAt)})</span>}
-            {post.semester && <span>{post.semester}</span>}
+          <div className="mt-3 flex items-center gap-3 text-sm">
+            <AuthorAvatar author={post.author} />
+            <div className="min-w-0">
+              <div className="font-medium">
+                <AuthorName author={post.author} />
+              </div>
+              <div className="flex flex-wrap gap-x-3 text-muted">
+                <span>{formatDate(post.createdAt)}</span>
+                {post.editedAt && <span>(edited {formatDate(post.editedAt)})</span>}
+                {post.semester && <span>{post.semester}</span>}
+              </div>
+            </div>
           </div>
           <div className="mt-3">
             <PostTags post={post} />

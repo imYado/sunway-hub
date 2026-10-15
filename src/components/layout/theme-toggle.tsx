@@ -12,7 +12,7 @@ function currentTheme(): "light" | "dark" {
 }
 
 /** Switches between light and dark mode. Without a choice the site follows the device. */
-export function ThemeToggle() {
+export function ThemeToggle({ variant = "button" }: { variant?: "button" | "menu" }) {
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
 
   useEffect(() => {
@@ -31,9 +31,18 @@ export function ThemeToggle() {
   }
 
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  const icon = theme === "dark" ? <Sun size={variant === "menu" ? 20 : 16} aria-hidden="true" /> : <Moon size={variant === "menu" ? 20 : 16} aria-hidden="true" />;
+  if (variant === "menu") {
+    return (
+      <button type="button" onClick={toggle} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-ink hover:bg-surface">
+        {icon}
+        {theme === "dark" ? "Light mode" : "Dark mode"}
+      </button>
+    );
+  }
   return (
     <button type="button" onClick={toggle} className="btn btn-sm" aria-label={label} title={label}>
-      {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+      {icon}
     </button>
   );
 }

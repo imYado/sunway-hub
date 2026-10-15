@@ -417,13 +417,40 @@ for (const colorScheme of ["light", "dark"] as const) test(`accessibility (${col
 test("pop-up menu closes on an outside click and on Escape", async ({ page }) => {
   // A fresh member: Bob has used up his sign-in codes for the hour (5 per email).
   await signInMember(page, "frank@imail.sunway.edu.my", "frank_m");
-  const menu = page.locator("details[data-popup]");
-  await page.getByLabel("Menu").click();
+  // On a laptop the "More" menu sits at the bottom of the left sidebar.
+  const sidebar = page.locator("aside");
+  const menu = sidebar.locator("details[data-popup]");
+  await sidebar.getByLabel("More").click();
   await expect(menu).toHaveAttribute("open", "");
   await page.locator("main").click({ position: { x: 5, y: 5 } });
   await expect(menu).not.toHaveAttribute("open", "");
-  await page.getByLabel("Menu").click();
+  await sidebar.getByLabel("More").click();
   await expect(menu).toHaveAttribute("open", "");
   await page.keyboard.press("Escape");
   await expect(menu).not.toHaveAttribute("open", "");
+
+  // The profile button is the member's own picture (a coloured initial until they upload one).
+  await sidebar.getByRole("link", { name: "Profile" }).click();
+  await page.waitForURL(/\/u\/frank_m$/);
+  await expect(sidebar.getByRole("link", { name: "Profile" })).toHaveAttribute("aria-current", "page");
+});
+
+test("on a phone the main pages sit in a bar along the bottom", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await signInMember(page, "grace@imail.sunway.edu.my", "grace_m");
+  await page.goto("/");
+  await expect(page.locator("aside")).toBeHidden();
+  const bar = page.locator("nav[aria-label='Main']:visible");
+  await expect(bar).toHaveCount(1);
+  for (const name of ["Home", "Search", "New post", "Market", "Profile"]) {
+    await expect(bar.getByRole("link", { name })).toBeVisible();
+  }
+  await bar.getByRole("link", { name: "Market" }).click();
+  await page.waitForURL(/\/market$/);
+  await expect(bar.getByRole("link", { name: "Market" })).toHaveAttribute("aria-current", "page");
+  // Everything else is in the "More" menu at the top.
+  await page.locator("header").getByLabel("More").click();
+  await expect(page.locator("header").getByRole("link", { name: "Study groups" })).toBeVisible();
+  await context.close();
 });
