@@ -65,7 +65,7 @@ export async function requestAdminReset(rawEmail: string, ipKey: string): Promis
   await issueOtp(email, "admin_reset");
 }
 
-interface SessionContext {
+export interface SessionContext {
   ipHash?: string | null;
   userAgent?: string | null;
 }
@@ -88,6 +88,25 @@ async function ensureUser(email: string): Promise<typeof users.$inferSelect> {
   return again;
 }
 
+/**
+ * Creates an active session for a member whose email has already been proven
+ * (by an emailed code or by their university Microsoft account).
+ */
+export async function signInMember(email: string, ctx: SessionContext, refusedMessage: string): Promise<NewSession> {
+  const user = await ensureUser(email);
+  if (user.status === "banned" || user.status === "deleted") throw new AppError(refusedMessage);
+  if (user.status === "suspended") {
+    if (user.suspendedUntil && user.suspendedUntil.getTime() <= Date.now()) {
+      await db.update(users).set({ status: "active", suspendedUntil: null }).where(eq(users.id, user.id));
+    } else {
+      const until = user.suspendedUntil ? ` until ${formatDate(user.suspendedUntil)}` : "";
+      throw new AppError(`This account is suspended${until}. Contact the site admin if you think this is a mistake.`, 403);
+    }
+  }
+  const s = await createSessionRecord({ userId: user.id, email, stage: "active", ...ctx });
+  return { token: s.token, expiresAt: s.expiresAt, stage: "active" };
+}
+
 /** Step 2: verify the emailed code and create a session (fully active, or pending the admin password step). */
 export async function verifyLoginCode(
   rawEmail: string,
@@ -106,20 +125,7 @@ export async function verifyLoginCode(
   const ok = await verifyOtp(email, purpose, code);
   if (!ok) throw new AppError(BAD_CODE_MESSAGE);
 
-  if (kind === "member") {
-    const user = await ensureUser(email);
-    if (user.status === "banned" || user.status === "deleted") throw new AppError(BAD_CODE_MESSAGE);
-    if (user.status === "suspended") {
-      if (user.suspendedUntil && user.suspendedUntil.getTime() <= Date.now()) {
-        await db.update(users).set({ status: "active", suspendedUntil: null }).where(eq(users.id, user.id));
-      } else {
-        const until = user.suspendedUntil ? ` until ${formatDate(user.suspendedUntil)}` : "";
-        throw new AppError(`This account is suspended${until}. Contact the site admin if you think this is a mistake.`, 403);
-      }
-    }
-    const s = await createSessionRecord({ userId: user.id, email, stage: "active", ...ctx });
-    return { token: s.token, expiresAt: s.expiresAt, stage: "active" };
-  }
+  if (kind === "member") return signInMember(email, ctx, BAD_CODE_MESSAGE);
 
   // Admin: first-time setup or password reset. Both lead to "create your password".
   const user = await ensureUser(email);

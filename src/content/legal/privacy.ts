@@ -61,6 +61,7 @@ We use a small number of service providers to run the site:
 - **Vercel Inc.** hosts the website and stores uploaded files (Vercel Blob, private storage).
 - **Neon Inc.** hosts the database.
 - **Resend Inc.** and **Google LLC** (Gmail) are used only to send sign-in codes and notification emails.
+- **Microsoft Corporation** handles sign-in when you choose "Sign in with your Sunway Microsoft account". Microsoft tells us only your university email address and name; we never see your Microsoft password.
 
 These providers may store or process data outside Malaysia (for example in Singapore or the United States). By signing up, you consent to your data being transferred and stored outside Malaysia for these purposes. We choose Singapore regions where available.
 

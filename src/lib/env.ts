@@ -39,6 +39,12 @@ export const env = {
   get storageDriver(): "vercel" | "local" {
     return process.env.STORAGE_DRIVER === "local" ? "local" : "vercel";
   },
+  get microsoftClientId(): string | undefined {
+    return process.env.MICROSOFT_CLIENT_ID?.trim() || undefined;
+  },
+  get microsoftClientSecret(): string | undefined {
+    return process.env.MICROSOFT_CLIENT_SECRET || undefined;
+  },
   get emailTransport(): "smtp" | "file" {
     return process.env.EMAIL_TRANSPORT === "file" ? "file" : "smtp";
   },

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Pages that logged-out visitors may see. Everything else is members-only.
 const PUBLIC_PATHS = ["/login", "/terms", "/privacy", "/guidelines", "/copyright", "/contact"];
-const PUBLIC_API = ["/api/cron/"];
+const PUBLIC_API = ["/api/cron/", "/api/auth/microsoft"];
 
 const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-sh_session" : "sh_session";
 
