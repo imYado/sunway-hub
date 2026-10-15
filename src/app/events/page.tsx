@@ -69,7 +69,7 @@ function Calendar({ year, month, events }: { year: number; month: number; events
 }
 
 export default async function EventsPage({ searchParams }: { searchParams: Promise<{ view?: string; month?: string }> }) {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const sp = await searchParams;
   const view = sp.view === "calendar" ? "calendar" : "list";
   const now = klYearMonth(new Date());

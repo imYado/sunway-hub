@@ -6,7 +6,7 @@ import { generateOtp, hashOtp, safeEqualHex } from "@/lib/crypto";
 import { env } from "@/lib/env";
 import { sendEmail } from "../email";
 
-export type OtpPurpose = "login" | "admin_setup" | "admin_reset" | "delete_account";
+export type OtpPurpose = "login" | "admin_setup" | "admin_reset" | "delete_account" | "login_other";
 
 export const OTP_TTL_MINUTES = 10;
 export const OTP_MAX_ATTEMPTS = 5;
@@ -16,6 +16,7 @@ const SUBJECTS: Record<OtpPurpose, string> = {
   admin_setup: "Your SJ Study admin setup code",
   admin_reset: "Your SJ Study password reset code",
   delete_account: "Confirm deleting your SJ Study account",
+  login_other: "Your SJ Study sign-in code",
 };
 
 /** Issues a new code (invalidating older ones for the same email + purpose) and emails it. */

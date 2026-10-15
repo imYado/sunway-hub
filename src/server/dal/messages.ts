@@ -1,4 +1,5 @@
 import "server-only";
+import { assertSunwayVerified } from "./verification";
 import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -130,6 +131,7 @@ export const startSchema = z.object({
 export async function startConversation(actor: Actor, raw: z.input<typeof startSchema>): Promise<{ id: string }> {
   const input = startSchema.parse(raw);
   if (!input.to && !input.postId) throw new AppError("Choose who to message.");
+  await assertSunwayVerified(actor);
 
   let recipientId: string;
   let anonymous = false;

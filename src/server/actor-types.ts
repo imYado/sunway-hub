@@ -9,4 +9,6 @@ export interface Actor {
   reauthAt: Date | null;
   /** Club ids this user manages (club_manager flag per club). */
   managedClubIds: string[];
+  /** Set only for a logged-out visitor who chose "Continue as a guest": read-only. */
+  guest?: true;
 }

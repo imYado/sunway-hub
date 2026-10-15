@@ -1,10 +1,10 @@
 import { env } from "@/lib/env";
 import { buildIcs } from "@/lib/ics";
-import { getActor } from "@/server/actor";
+import { getViewer } from "@/server/actor";
 import { getEventForIcs } from "@/server/dal/posts";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const actor = await getActor();
+  const actor = await getViewer();
   if (!actor) return new Response("Please sign in.", { status: 401 });
   const { id } = await params;
   try {

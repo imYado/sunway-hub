@@ -43,7 +43,7 @@ const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" 
 export const pronounsEnum = pgEnum("pronouns", ["he", "she", "unspecified"]);
 export const roleLabelEnum = pgEnum("role_label", ["student", "teacher", "other"]);
 export const userStatusEnum = pgEnum("user_status", ["active", "suspended", "banned", "deleted"]);
-export const otpPurposeEnum = pgEnum("otp_purpose", ["login", "admin_setup", "admin_reset", "delete_account"]);
+export const otpPurposeEnum = pgEnum("otp_purpose", ["login", "admin_setup", "admin_reset", "delete_account", "login_other"]);
 export const sessionStageEnum = pgEnum("session_stage", ["active", "needs_password", "needs_totp"]);
 export const postTypeEnum = pgEnum("post_type", ["study", "event", "club", "discussion", "market"]);
 export const marketKindEnum = pgEnum("market_kind", ["sell", "buy", "swap", "borrow"]);
@@ -97,6 +97,11 @@ export const users = pgTable(
     pronouns: pronounsEnum("pronouns").notNull().default("unspecified"),
     roleLabel: roleLabelEnum("role_label").notNull().default("student"),
     teacherVerified: boolean("teacher_verified").notNull().default(false),
+    // False for accounts made with a non-Sunway email while university mail was
+    // unreachable. The admin flips it once the person proves their Sunway address.
+    sunwayVerified: boolean("sunway_verified").notNull().default(true),
+    // The Sunway address such a person says is theirs (shown to the admin only).
+    claimedSunwayEmail: text("claimed_sunway_email"),
     emailPublic: boolean("email_public").notNull().default(false),
     status: userStatusEnum("status").notNull().default("active"),
     suspendedUntil: ts("suspended_until"),

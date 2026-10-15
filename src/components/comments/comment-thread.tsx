@@ -41,6 +41,7 @@ function CommentAuthor({ c }: { c: CommentView }) {
         {c.author.displayName ?? `@${c.author.username}`}
       </Link>
       {c.author.isPoster && <span className="badge ml-2">Poster</span>}
+      {c.author.notSunway && <span className="badge ml-2">Not verified as Sunway</span>}
     </span>
   );
 }

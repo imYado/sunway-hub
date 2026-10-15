@@ -8,5 +8,7 @@ export async function POST(req: NextRequest) {
   const token = await readSessionToken();
   if (token) await revokeSessionByToken(token);
   await clearSessionCookie();
-  return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
+  const res = NextResponse.redirect(new URL("/login", req.url), { status: 303 });
+  res.cookies.delete("sh_guest");
+  return res;
 }

@@ -25,7 +25,7 @@ const SOCIAL_URL: Record<string, (h: string) => string> = {
 };
 
 export default async function ClubPage({ params }: { params: Promise<{ slug: string }> }) {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const { slug } = await params;
   let detail;
   try {
@@ -164,7 +164,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
             </div>
           </details>
         )}
-        <ReportForm targetType="club" targetId={club.id} />
+        {!actor.guest && <ReportForm targetType="club" targetId={club.id} />}
       </section>
     </div>
   );

@@ -29,7 +29,7 @@ export async function signInMember(page: Page, email: string, username?: string)
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   const code = await latestCode(email, since);
   await page.getByLabel("6-digit code").fill(code);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   if (username) {
     await expect(page.getByRole("heading", { name: "Welcome to SJ Study" })).toBeVisible();
     await page.getByLabel("Full name").fill(`Test ${username}`);
@@ -49,7 +49,7 @@ export async function signInAdmin(page: Page) {
   await page.getByLabel("Email").fill(ADMIN_EMAIL);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Password").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 }
 

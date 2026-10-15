@@ -8,7 +8,7 @@ import { getMe } from "@/server/dal/users";
 export const metadata: Metadata = { title: "Leaderboard" };
 
 export default async function LeaderboardPage() {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const [rows, me] = await Promise.all([leaderboard(), getMe(actor)]);
   return (
     <div className="mx-auto max-w-3xl">

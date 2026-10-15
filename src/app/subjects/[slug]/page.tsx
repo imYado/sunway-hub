@@ -19,7 +19,7 @@ export default async function SubjectPage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ semester?: string; sort?: string; type?: string; page?: string }>;
 }) {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const { slug } = await params;
   const sp = await searchParams;
   const subject = await getSubject(slug);

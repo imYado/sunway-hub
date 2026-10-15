@@ -31,6 +31,7 @@ import {
   revertTitle,
   setRoleLabel,
   setTeacherVerified,
+  setSunwayVerified,
   setUsername,
   suspendUser,
   unhidePost,
@@ -139,6 +140,9 @@ export async function userAction(_: ActionState, fd: FormData): Promise<ActionSt
     const userId = str(fd, "userId");
     const reason = str(fd, "reason");
     switch (str(fd, "op")) {
+      case "verify_sunway":
+        await setSunwayVerified(a, userId);
+        break;
       case "verify_teacher":
         await setTeacherVerified(a, userId, true);
         break;

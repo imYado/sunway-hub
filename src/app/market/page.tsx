@@ -22,7 +22,7 @@ export default function MarketPage({ searchParams }: { searchParams: Promise<SP>
 }
 
 async function Market({ searchParams }: { searchParams: Promise<SP> }) {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const sp = await searchParams;
   const page = Number(sp.page ?? "1") || 1;
   const kind = MARKET_KINDS.some((k) => k.value === sp.kind) ? (sp.kind as MarketKind) : undefined;

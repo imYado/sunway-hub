@@ -20,7 +20,7 @@ For any privacy question or request, email **hubsunway@gmail.com**.
 
 When you use SJ Study we collect:
 
-- Your Sunway email address (used to sign in).
+- Your Sunway email address (used to sign in). If our codes can't reach your Sunway email, you may sign in with another email instead; we then keep both addresses, and only the admin sees the Sunway one.
 - Your name, username, bio, pronouns and role (student, teacher or other).
 - Your profile picture, if you upload one.
 - Content you upload: posts, descriptions, files, images and videos.
@@ -43,7 +43,7 @@ Our legal basis is your consent, which you give when you tick the box at sign-up
 
 ## 4. Who can see your data
 
-- SJ Study is members-only. Only signed-in members can see profiles and approved content.
+- Anyone can choose "Continue as a guest" to read approved posts, comments, profiles, clubs and events without an account. Guests cannot post, comment, vote or message. Your email address, private messages, timetable and study groups are never shown to guests. Search engines are asked not to index the site.
 - Your email address is **hidden by default**. Other members see it only if you turn on "Show my email" in your settings.
 - Your pending, rejected and "changes requested" posts are visible only to you and the admin.
 - Your timetable is private. Members of your study groups only see when you are busy or free, never your class names or rooms.
@@ -92,7 +92,7 @@ We protect data with encrypted connections, hashed sign-in codes and session tok
 
 ## 9. Cookies
 
-We use **one essential cookie** to keep you signed in. We do not use advertising, tracking or analytics cookies, and we do not load third-party scripts. Because we only use essential cookies, no cookie banner is needed.
+We use **essential cookies only**: one to keep you signed in, one that remembers you chose to browse as a guest, and a short-lived one while you sign in with Microsoft. We do not use advertising, tracking or analytics cookies, and we do not load third-party scripts. Because we only use essential cookies, no cookie banner is needed.
 
 ## 10. Children and minors
 

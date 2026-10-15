@@ -25,7 +25,7 @@ import { getSettings } from "@/server/settings";
 export const metadata: Metadata = { title: "Post" };
 
 async function load(id: string): Promise<PostDetail> {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   try {
     return await getPostDetail(actor, id);
   } catch (err) {
@@ -38,7 +38,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const post = await load(id);
   const v = post.viewer;
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const [comments, settings] = await Promise.all([listComments(actor, post.id), getSettings()]);
   const ctx = { postId: post.id, userId: actor.id, storageDriver: env.storageDriver, enabledKinds: settings.enabledFileKinds };
   const images = post.files.filter((f) => f.kind === "image");
@@ -199,7 +199,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           </ActionForm>
         )}
       </div>
-      {!v.isOwner && !post.deletedAt && <ReportForm targetType="post" targetId={post.id} />}
+      {!v.isOwner && !post.deletedAt && !actor.guest && <ReportForm targetType="post" targetId={post.id} />}
 
       {v.canDelete && (
         <section className="mt-6">
@@ -243,6 +243,10 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         </h2>
         {v.canInteract ? (
           <CommentComposer ctx={ctx} />
+        ) : actor.guest ? (
+          <p className="mt-2 text-sm text-muted">
+            <Link href="/login">Sign in</Link> to comment.
+          </p>
         ) : (
           <p className="mt-2 text-sm text-muted">Comments open once the post is approved.</p>
         )}
