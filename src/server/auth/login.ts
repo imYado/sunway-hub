@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { adminCredentials, notificationSettings, sessions, users } from "@/db/schema";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
-import { classifyEmail, isAdminEmail, isAllowedMemberEmail, isValidEmailShape, normaliseEmail } from "@/lib/email-domain";
+import { classifyEmail, isAdminEmail, normaliseEmail } from "@/lib/email-domain";
 import { env } from "@/lib/env";
 import { formatDate } from "@/lib/dates";
 import { isAcceptablePassword } from "@/lib/password-strength";
@@ -55,47 +55,6 @@ export async function startLogin(rawEmail: string, ipKey: string): Promise<Login
   }
   await issueOtp(email, "login");
   return { step: "code", email, purpose: "login" };
-}
-
-export const OTHER_EMAIL_IS_SUNWAY = "That's a Sunway address. Use the first step for Sunway emails.";
-export const OTHER_EMAIL_INVALID = "Enter a valid email address.";
-
-/**
- * Fallback for when university mail blocks our codes: the person names their
- * Sunway address, then signs in with any other email. The account is marked
- * not verified until the admin confirms the Sunway address is theirs.
- */
-export async function startOtherEmailLogin(rawSunwayEmail: string, rawOtherEmail: string, ipKey: string): Promise<{ email: string }> {
-  const sunwayEmail = normaliseEmail(rawSunwayEmail);
-  const email = normaliseEmail(rawOtherEmail);
-  await enforce("code-ip", ipKey, LIMITS.codeRequestPerIp.limit, LIMITS.codeRequestPerIp.window);
-  if (!isAllowedMemberEmail(sunwayEmail, env.allowedEmailDomains)) throw new AppError(REJECTED_MESSAGE);
-  if (!isValidEmailShape(email)) throw new AppError(OTHER_EMAIL_INVALID);
-  if (classifyEmail(email, emailOpts()) === "member") throw new AppError(OTHER_EMAIL_IS_SUNWAY);
-  await enforce("other-ip", ipKey, LIMITS.otherEmailPerIp.limit, LIMITS.otherEmailPerIp.window);
-  await enforce("other-email", email, LIMITS.otherEmailPerEmail.limit, LIMITS.otherEmailPerEmail.window);
-  // The admin account never signs in this way; it gets the same response but no code.
-  if (isAdminEmail(email, env.adminEmail)) return { email };
-  const [user] = await db.select({ status: users.status }).from(users).where(eq(users.email, email)).limit(1);
-  if (user?.status !== "banned") await issueOtp(email, "login_other");
-  return { email };
-}
-
-export async function verifyOtherEmailCode(
-  rawSunwayEmail: string,
-  rawOtherEmail: string,
-  code: string,
-  ipKey: string,
-  ctx: SessionContext = {},
-): Promise<NewSession> {
-  const sunwayEmail = normaliseEmail(rawSunwayEmail);
-  const email = normaliseEmail(rawOtherEmail);
-  await enforce("verify-ip", ipKey, LIMITS.codeVerifyPerIp.limit, LIMITS.codeVerifyPerIp.window);
-  await enforce("verify-email", email, LIMITS.codeVerifyPerEmail.limit, LIMITS.codeVerifyPerEmail.window);
-  if (!isAllowedMemberEmail(sunwayEmail, env.allowedEmailDomains)) throw new AppError(BAD_CODE_MESSAGE);
-  if (classifyEmail(email, emailOpts()) !== "rejected" || !isValidEmailShape(email)) throw new AppError(BAD_CODE_MESSAGE);
-  if (!(await verifyOtp(email, "login_other", code))) throw new AppError(BAD_CODE_MESSAGE);
-  return signInMember(email, ctx, BAD_CODE_MESSAGE, { claimedSunwayEmail: sunwayEmail });
 }
 
 export async function requestAdminReset(rawEmail: string, ipKey: string): Promise<void> {

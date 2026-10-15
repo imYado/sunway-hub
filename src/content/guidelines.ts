@@ -27,7 +27,7 @@ SJ Study is a friendly place for Sunway students, teachers and staff to share st
 
 ## What happens if you break the rules
 
-Every upload is checked by the admin before others can see it. Content that breaks these guidelines is rejected or removed. Repeated or serious problems can lead to a warning, a suspension, or a permanent ban.
+Posts appear straight away and are reviewed by the admin afterwards. Content that breaks these guidelines is removed. Repeated or serious problems can lead to a warning, a suspension, or a permanent ban.
 
 Questions? Use the [Contact page](/contact).
 `;

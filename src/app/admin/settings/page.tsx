@@ -36,10 +36,6 @@ export default async function SettingsAdminPage() {
             ))}
           </div>
         </fieldset>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="requireReapprovalAfterTitleEdit" defaultChecked={s.requireReapprovalAfterTitleEdit} className="h-4 w-4" />
-          Require re-approval after a title edit
-        </label>
         <Field label="Announcement banner (shown on every page, leave empty for none)" htmlFor="announcement">
           <textarea id="announcement" name="announcement" rows={2} maxLength={300} defaultValue={s.announcement} className="input" />
         </Field>

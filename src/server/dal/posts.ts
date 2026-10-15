@@ -38,7 +38,6 @@ import { audit } from "../audit";
 import { AppError, ForbiddenError, NotFoundError } from "../errors";
 import { assertClean } from "../profanity";
 import { enforce, LIMITS } from "../rate-limit";
-import { getSettings } from "../settings";
 import { storage } from "../storage";
 import { notify, notifyFollowersOfPost } from "./notifications";
 import { assertCanViewPost, canDeletePost, canEditPost, canInteract, canViewPost, managesClub } from "./policy";
@@ -180,7 +179,9 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
   const subjectRows = await upsertSubjects(input.subjects);
   const postId = randomUUID();
   const files = await finaliseUploads(actor, postId, input.files);
-  const autoApproved = actor.isAdmin;
+  // Posts go live straight away. Until the admin has looked at one, decidedAt stays
+  // empty and it shows in the admin's review queue (see needsReviewCondition).
+  const reviewed = actor.isAdmin;
 
   try {
     await db.transaction(async (tx) => {
@@ -196,9 +197,9 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
         links,
         anonymous: input.anonymous,
         marketKind: input.type === "market" ? (input.marketKind ?? null) : null,
-        status: autoApproved ? "approved" : "pending",
-        decidedAt: autoApproved ? new Date() : null,
-        decidedBy: autoApproved ? actor.id : null,
+        status: "approved",
+        decidedAt: reviewed ? new Date() : null,
+        decidedBy: reviewed ? actor.id : null,
         // Posting means agreeing to the notice beside the Post button, so record when that happened.
         ownWorkConfirmedAt: new Date(),
       });
@@ -224,10 +225,8 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
       .catch(() => {});
     throw err;
   }
-  if (autoApproved) {
-    await notifyFollowersOfPost({ id: postId, authorId: actor.id, title: input.title, clubId: input.type === "club" ? (input.clubId ?? null) : null });
-  }
-  return { id: postId, status: autoApproved ? "approved" : "pending" };
+  await notifyFollowersOfPost({ id: postId, authorId: actor.id, title: input.title, clubId: input.type === "club" ? (input.clubId ?? null) : null });
+  return { id: postId, status: "approved" };
 }
 
 // ---------------------------------------------------------------------------
@@ -605,13 +604,13 @@ export async function editPostTitle(actor: Actor, postId: string, rawTitle: stri
   if (title === post.title) return;
   await enforce("write", actor.id, LIMITS.writePerUser.limit, LIMITS.writePerUser.window);
   await assertClean(title);
-  const settings = await getSettings();
-  const needsReapproval = settings.requireReapprovalAfterTitleEdit && post.status === "approved" && !actor.isAdmin;
+  // An edited post stays live but goes back in the admin's review queue.
+  const backToReview = post.status === "approved" && !actor.isAdmin;
   await db.transaction(async (tx) => {
     await tx.insert(postTitleHistory).values({ postId, oldTitle: post.title, newTitle: title, editedBy: actor.id });
     await tx
       .update(posts)
-      .set({ title, titleEdited: true, editedAt: new Date(), updatedAt: new Date(), ...(needsReapproval ? { status: "pending" as const } : {}) })
+      .set({ title, titleEdited: true, editedAt: new Date(), updatedAt: new Date(), ...(backToReview ? { decidedAt: null, decidedBy: null } : {}) })
       .where(eq(posts.id, postId));
   });
 }
@@ -637,13 +636,10 @@ export async function editPost(actor: Actor, postId: string, raw: EditPostInput)
   const removed = existing.filter((f) => !keep.has(f.id)).map((f) => f.id);
   if (keep.size + input.files.length > MAX_FILES_PER_POST) throw new AppError(`You can attach up to ${MAX_FILES_PER_POST} files.`);
 
-  const settings = await getSettings();
-  const status: PostRow["status"] =
-    post.status === "rejected" || post.status === "changes_requested"
-      ? "pending"
-      : post.status === "approved" && settings.requireReapprovalAfterTitleEdit && !actor.isAdmin
-        ? "pending"
-        : post.status;
+  // Rejected posts and posts with requested changes wait for the admin again; a live
+  // post stays live but goes back in the admin's review queue.
+  const status: PostRow["status"] = post.status === "rejected" || post.status === "changes_requested" ? "pending" : post.status;
+  const backToReview = status === "approved" && !actor.isAdmin;
   const subjectRows = await upsertSubjects(input.subjects);
   const firstPosition = existing.reduce((m, f) => Math.max(m, f.position + 1), 0);
   const files = await finaliseUploads(actor, postId, input.files, { firstPosition });
@@ -669,6 +665,7 @@ export async function editPost(actor: Actor, postId: string, raw: EditPostInput)
           updatedAt: now,
           status,
           ...(status === "pending" && post.status !== "pending" ? { decisionReason: null, decidedAt: null, decidedBy: null } : {}),
+          ...(backToReview ? { decidedAt: null, decidedBy: null } : {}),
         })
         .where(eq(posts.id, postId));
       await tx.delete(postSubjects).where(eq(postSubjects.postId, postId));

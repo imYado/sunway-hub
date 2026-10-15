@@ -44,7 +44,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
         path="/"
         empty={
           <EmptyState title="Nothing here yet">
-            Be the first to <Link href="/posts/new">post something</Link>. Every post is checked by the admin before it appears.
+            Be the first to <Link href="/posts/new">post something</Link>.
           </EmptyState>
         }
       />

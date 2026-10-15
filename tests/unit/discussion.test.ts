@@ -103,7 +103,8 @@ describe.skipIf(!hasDb)("discussions, editing, comments and votes", () => {
 
   it("threaded comments, edits, votes and deletes", async () => {
     const id = await approvedPost(alice, "Discussion with comments");
-    const pending = await createPost(alice, { type: "discussion", title: "Still pending post" });
+    const pending = await createPost(alice, { type: "discussion", title: "Rejected post" });
+    await decidePost(admin, pending.id, { decision: "reject", reason: "Off topic" });
     await expect(createComment(bob, { postId: pending.id, body: "Too early" })).rejects.toThrow(/could not find/);
 
     const top = await createComment(bob, { postId: id, body: "First!" });

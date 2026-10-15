@@ -11,7 +11,7 @@ import { bulkDecideAction, decideAvatarAction, decideLogoAction, decidePostActio
 import { requireAdminPage } from "@/server/actor";
 import { pendingImages, pendingPosts } from "@/server/dal/admin";
 
-export const metadata: Metadata = { title: "Approval queue" };
+export const metadata: Metadata = { title: "Review queue" };
 
 
 export default async function QueuePage() {
@@ -20,7 +20,10 @@ export default async function QueuePage() {
 
   return (
     <div>
-      <PageTitle>Approval queue</PageTitle>
+      <PageTitle>Review queue</PageTitle>
+      <p className="mb-4 text-sm text-muted">
+        New and edited posts are live straight away. Approve to mark one as reviewed, or reject it to take it down.
+      </p>
       <QueueShortcuts />
 
       <section aria-labelledby="q-posts">
@@ -28,7 +31,7 @@ export default async function QueuePage() {
           Posts and events ({posts.length})
         </h2>
         {posts.length === 0 ? (
-          <EmptyState title="Nothing waiting for approval" />
+          <EmptyState title="Nothing waiting for review" />
         ) : (
           <>
             <ul className="space-y-4">
@@ -45,6 +48,11 @@ export default async function QueuePage() {
                       className="h-4 w-4"
                     />
                     <span className="badge">{POST_TYPE_LABEL[p.type]}</span>
+                    {p.status === "approved" ? (
+                      <span className="badge">Live, not reviewed</span>
+                    ) : (
+                      <span className="badge text-danger border-danger">Hidden until approved</span>
+                    )}
                     {p.clubName && <span>{p.clubName}</span>}
                     <span>{formatDateTime(p.createdAt)}</span>
                     <span>

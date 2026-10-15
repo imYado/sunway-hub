@@ -13,9 +13,7 @@ import {
   completeTotpStep,
   requestAdminReset,
   startLogin,
-  startOtherEmailLogin,
   verifyLoginCode,
-  verifyOtherEmailCode,
   type NewSession,
 } from "@/server/auth/login";
 import type { OtpPurpose } from "@/server/auth/otp";
@@ -24,7 +22,7 @@ import { AppError, RateLimitError } from "@/server/errors";
 import { clientIp, userAgent } from "@/server/request";
 
 export type LoginResult =
-  | { ok: true; step?: "code" | "password" | "create_password" | "totp" | "done" | "other_code"; purpose?: OtpPurpose; email?: string }
+  | { ok: true; step?: "code" | "password" | "create_password" | "totp" | "done"; purpose?: OtpPurpose; email?: string }
   | { ok: false; error: string };
 
 const NEUTRAL_FAILURE = "We could not continue right now. Please wait a moment and try again.";
@@ -134,32 +132,6 @@ export async function forgotPasswordAction(email: string): Promise<LoginResult> 
       return { ok: false, error: errorOf(err) };
     }
   });
-}
-
-/** Fallback when the Sunway code never arrives: get a code at any other email instead. */
-export async function startOtherEmailAction(sunwayEmail: string, otherEmail: string): Promise<LoginResult> {
-  return padTiming(async () => {
-    try {
-      const c = await ctx();
-      const r = await startOtherEmailLogin(sunwayEmail, otherEmail, c.ipKey);
-      return { ok: true, step: "other_code", email: r.email };
-    } catch (err) {
-      return { ok: false, error: errorOf(err) };
-    }
-  });
-}
-
-export async function verifyOtherCodeAction(sunwayEmail: string, otherEmail: string, code: string): Promise<LoginResult> {
-  return padTiming(async () => {
-    try {
-      const c = await ctx();
-      const s = await verifyOtherEmailCode(sunwayEmail, otherEmail, code.replace(/\s+/g, ""), c.ipKey, { ipHash: c.ipHash, userAgent: c.userAgent });
-      await startSession(s);
-      return { ok: true, step: "done" };
-    } catch (err) {
-      return { ok: false, error: errorOf(err) };
-    }
-  }, 500);
 }
 
 /** Read-only browsing without an account. */

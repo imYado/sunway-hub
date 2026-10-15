@@ -43,12 +43,23 @@ export function requireRecentAuth(actor: Actor) {
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
+/**
+ * Posts the admin still has to look at: live posts nobody has reviewed yet (new or
+ * edited), plus posts sent back after a rejection or a request for changes.
+ */
+function needsReviewCondition(): SQL {
+  return and(
+    isNull(posts.deletedAt),
+    or(eq(posts.status, "pending"), and(eq(posts.status, "approved"), isNull(posts.decidedAt))),
+  ) as SQL;
+}
+
 export async function dashboard(actor: Actor) {
   assertAdmin(actor);
   const n = async (q: Promise<{ n: number }[]>) => Number((await q)[0]?.n ?? 0);
   const weekAgo = new Date(Date.now() - 7 * 86_400_000);
   const [pendingPosts, pendingAvatars, pendingLogos, openReports, pendingTeachers, pendingManagers, newUsers, openMessages] = await Promise.all([
-    n(db.select({ n: count() }).from(posts).where(and(eq(posts.status, "pending"), isNull(posts.deletedAt)))),
+    n(db.select({ n: count() }).from(posts).where(needsReviewCondition())),
     n(db.select({ n: count() }).from(userAvatars).where(isNotNull(userAvatars.pendingFileId))),
     n(db.select({ n: count() }).from(clubs).where(and(isNotNull(clubs.pendingLogoFileId), isNull(clubs.deletedAt)))),
     n(db.select({ n: count() }).from(reports).where(eq(reports.status, "open"))),
@@ -95,6 +106,7 @@ export async function pendingPosts(actor: Actor) {
       titleEdited: posts.titleEdited,
       links: posts.links,
       anonymous: posts.anonymous,
+      status: posts.status,
       authorId: users.id,
       username: users.username,
       displayName: users.displayName,
@@ -109,7 +121,7 @@ export async function pendingPosts(actor: Actor) {
     .innerJoin(users, eq(users.id, posts.authorId))
     .leftJoin(clubs, eq(clubs.id, posts.clubId))
     .leftJoin(events, eq(events.postId, posts.id))
-    .where(and(eq(posts.status, "pending"), isNull(posts.deletedAt)))
+    .where(needsReviewCondition())
     .orderBy(asc(posts.createdAt))
     .limit(100);
   const ids = rows.map((r) => r.id);
@@ -160,7 +172,10 @@ export async function decidePost(actor: Actor, postId: string, raw: z.input<type
       : status === "rejected"
         ? `Reason: ${reason}`
         : `Note from the admin: ${reason}\n\nOnly the title can be edited. To change anything else, delete the post and submit it again.`;
-  await notify([post.authorId], { kind: "decision", title: titles[status], body, link: `/posts/${post.id}` });
+  // Approving a post that is already live just marks it reviewed; nobody needs a notification.
+  if (!(status === "approved" && post.status === "approved")) {
+    await notify([post.authorId], { kind: "decision", title: titles[status], body, link: `/posts/${post.id}` });
+  }
   if (status === "approved" && post.status !== "approved") {
     await notifyFollowersOfPost({ id: post.id, authorId: post.authorId, title: post.title, clubId: post.type === "club" ? post.clubId : null });
   }

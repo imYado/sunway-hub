@@ -1,5 +1,6 @@
 "use client";
 
+import { DM_PRIVACY_NOTE } from "./privacy-note";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CleanTextarea } from "@/components/ui/clean-input";
@@ -34,6 +35,7 @@ export function StartConversationForm({ to, postId }: { to?: string; postId?: st
         Your message
       </label>
       <CleanTextarea id="dm-body" name="body" rows={5} maxLength={DM_MAX} required showCount />
+      <p className="mt-2 text-xs text-muted">{DM_PRIVACY_NOTE}</p>
       <button type="submit" className="btn btn-primary mt-3" disabled={busy}>
         {busy ? "Sending..." : "Send request"}
       </button>
