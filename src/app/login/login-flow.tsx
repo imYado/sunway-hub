@@ -22,12 +22,22 @@ function safeNext(next: string | undefined): string {
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
 
-export function LoginFlow({ initialStep, next }: { initialStep: Step; next?: string }) {
+export function LoginFlow({
+  initialStep,
+  next,
+  microsoft = false,
+  initialError = null,
+}: {
+  initialStep: Step;
+  next?: string;
+  microsoft?: boolean;
+  initialError?: string | null;
+}) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(initialStep);
   const [email, setEmail] = useState("");
   const [purpose, setPurpose] = useState<OtpPurpose>("login");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [info, setInfo] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [pending, startTransition] = useTransition();
@@ -58,6 +68,15 @@ export function LoginFlow({ initialStep, next }: { initialStep: Step; next?: str
       <div className="card p-6">
         <p className="mb-6 text-center font-display text-xl font-extrabold">SJ Study</p>
 
+        {step === "email" && microsoft && (
+          <>
+            <a href={`/api/auth/microsoft${next ? `?next=${encodeURIComponent(safeNext(next))}` : ""}`} className="btn btn-primary w-full">
+              Sign in with your Sunway Microsoft account
+            </a>
+            <p className="my-4 text-center text-xs text-muted">or get a code by email</p>
+          </>
+        )}
+
         {step === "email" && (
           <form
             onSubmit={(e) => {
@@ -83,8 +102,8 @@ export function LoginFlow({ initialStep, next }: { initialStep: Step; next?: str
               placeholder="you@imail.sunway.edu.my"
               aria-describedby={error ? "login-error" : undefined}
             />
-            <button type="submit" className="btn btn-primary mt-4 w-full" disabled={pending}>
-              {pending ? "Please wait..." : "Continue"}
+            <button type="submit" className={`btn mt-4 w-full ${microsoft ? "" : "btn-primary"}`} disabled={pending}>
+              {pending ? "Please wait..." : microsoft ? "Email me a code" : "Continue"}
             </button>
           </form>
         )}
@@ -98,8 +117,15 @@ export function LoginFlow({ initialStep, next }: { initialStep: Step; next?: str
             }}
           >
             <h1 className="text-lg font-semibold">Check your email</h1>
-            <p className="mb-4 mt-1 text-sm text-muted">
+            <p className="mb-2 mt-1 text-sm text-muted">
               If this address can sign in, a 6-digit code is on its way to <span className="text-ink">{email}</span>. It expires in 10 minutes.
+            </p>
+            <p className="mb-4 text-sm text-muted">
+              Can&apos;t find it? Check your junk or spam folder. Still nothing? Email{" "}
+              <a href="mailto:hubsunway@gmail.com" className="underline">
+                hubsunway@gmail.com
+              </a>{" "}
+              from your university email and we&apos;ll help you sign in.
             </p>
             <label htmlFor="code" className="label">
               6-digit code

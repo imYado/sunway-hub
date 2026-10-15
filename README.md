@@ -11,7 +11,7 @@ SJ Study is not affiliated with or endorsed by Sunway University or Sunway Group
 - Vercel Blob in **private** mode for files, Vercel Cron for daily jobs
 - `nodemailer` with Gmail SMTP for email
 
-**External services.** Hosting uses only Vercel and Neon. The only other external dependency is Gmail SMTP through `nodemailer`, used to send sign-in codes and the daily notification digest. It sits behind `sendEmail()` in `src/server/email.ts`, so swapping providers means changing that one file. The Privacy Policy says the same thing.
+**External services.** Hosting uses only Vercel and Neon. The only other external dependencies are Resend (when `RESEND_API_KEY` is set) and Gmail SMTP through `nodemailer`, used to send sign-in codes and the daily notification digest, plus Microsoft sign-in (when `MICROSOFT_CLIENT_ID` is set) so Sunway accounts can sign in without an emailed code. It sits behind `sendEmail()` in `src/server/email.ts`, so swapping providers means changing that one file. The Privacy Policy says the same thing.
 
 ## Project layout
 
@@ -101,7 +101,9 @@ Gmail allows roughly 500 messages a day. That is why every non-urgent notificati
 | `OTP_PEPPER` | yes | Random string of 32+ characters. Used to hash sign-in codes and rate-limit keys |
 | `ADMIN_EMAIL` | yes | `mohammedalqadhi745@gmail.com`. The only account that can ever be admin |
 | `ALLOWED_EMAIL_DOMAINS` | yes | `imail.sunway.edu.my,sunway.edu.my`. Exact domains only, so subdomains and lookalikes are rejected |
-| `SMTP_USER`, `SMTP_APP_PASSWORD`, `SMTP_FROM` | yes | Gmail settings from step 4 |
+| `RESEND_API_KEY`, `EMAIL_FROM` | recommended | Resend API key and sender, for example `"SJ Study <noreply@sjstudy.booktabib.com>"`. Used first when set. University mail servers may block codes sent from Gmail |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | recommended | Adds "Sign in with your Sunway Microsoft account", which needs no email. Register an app in Microsoft Entra ID (accounts in any organizational directory) with redirect URI `<APP_URL>/api/auth/microsoft/callback`. Only Sunway's directories are accepted (`src/lib/microsoft.ts`) |
+| `SMTP_USER`, `SMTP_APP_PASSWORD`, `SMTP_FROM` | yes, unless Resend is set | Gmail settings from step 4. Used as the fallback when Resend is set |
 | `CRON_SECRET` | yes | Random string. Vercel Cron sends it as a Bearer token |
 | `APP_URL` | yes | Public URL with no trailing slash, e.g. `https://sjstudy.vercel.app` |
 | `STORAGE_CAP_GB` | yes | Blob allowance in GB. Uploads show a warning at 80% and are refused at 90% |
