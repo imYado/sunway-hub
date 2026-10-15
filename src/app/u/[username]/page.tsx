@@ -72,6 +72,11 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
               Edit profile
             </Link>
           )}
+          {!profile.isOwner && (
+            <Link href={`/messages/new?to=${profile.username}`} className="btn btn-primary btn-sm mr-2 mt-3">
+              Message
+            </Link>
+          )}
           {profile.viewerIsAdmin && !profile.isOwner && (
             <Link href={`/admin/users/${profile.id}`} className="btn btn-sm mt-3">
               Manage in admin

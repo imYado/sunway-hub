@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, FileText, Link2, MessageSquare } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/dates";
-import { POST_TYPE_LABEL } from "@/lib/rules";
+import { MARKET_KIND_LABEL, POST_TYPE_LABEL } from "@/lib/rules";
 import type { PostCard as PostCardData } from "@/server/dal/posts";
 import { VoteControl } from "./vote-control";
 
@@ -54,7 +54,10 @@ export function PostCard({ post, showStatus = false, path }: { post: PostCardDat
       <VoteControl kind="post" id={post.id} postId={post.id} score={post.score} vote={post.viewerVote} canVote={votable && !post.viewerIsAuthor} path={path} />
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-          <span className="badge">{POST_TYPE_LABEL[post.type]}</span>
+          <span className="badge">
+            {POST_TYPE_LABEL[post.type]}
+            {post.marketKind && ` · ${MARKET_KIND_LABEL[post.marketKind]}`}
+          </span>
           {showStatus && <StatusBadge status={post.status} />}
           {post.hiddenByReports && <span className="badge text-danger">Hidden while under review</span>}
           <AuthorName author={post.author} />

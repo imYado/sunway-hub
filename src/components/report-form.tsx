@@ -8,16 +8,18 @@ export function ReportForm({
   targetType,
   targetId,
   className = "mt-4",
+  label = "Report",
 }: {
-  targetType: "post" | "user" | "club" | "study_group" | "comment";
+  targetType: "post" | "user" | "club" | "study_group" | "comment" | "message";
   targetId: string;
   className?: string;
+  label?: string;
 }) {
   const id = `report-${targetType}-${targetId}`;
   return (
     <details className={className}>
       <summary className="btn btn-sm cursor-pointer list-none">
-        <Flag size={14} aria-hidden="true" /> Report
+        <Flag size={14} aria-hidden="true" /> {label}
       </summary>
       <div className="surface mt-2 p-4">
         <ActionForm action={reportAction} resetOnSuccess>

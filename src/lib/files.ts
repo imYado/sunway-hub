@@ -35,6 +35,17 @@ export function precheckCommentFile(file: { name: string; type: string; size: nu
   if (file.size > COMMENT_FILE_MAX_BYTES) return `"${file.name}" is too large. Comment attachments can be up to ${COMMENT_FILE_MAX_BYTES / MB} MB.`;
   return null;
 }
+/** Private messages: images only (no video), re-encoded and stored encrypted. */
+export const DM_FILE_KINDS: FileKind[] = ["image"];
+export const DM_FILE_MAX_BYTES = 5 * MB;
+export const MAX_FILES_PER_DM = 4;
+
+export function precheckDmFile(file: { name: string; type: string; size: number }): string | null {
+  const problem = precheckFile(file, DM_FILE_KINDS);
+  if (problem) return problem.replace("is not an allowed file type.", "can't be sent. Messages accept JPG, PNG or WebP images only.");
+  if (file.size > DM_FILE_MAX_BYTES) return `"${file.name}" is too large. Images in messages can be up to ${DM_FILE_MAX_BYTES / MB} MB.`;
+  return null;
+}
 export const AVATAR_MAX_BYTES = 2 * MB;
 export const AVATAR_MIME = ["image/jpeg", "image/png", "image/webp"];
 

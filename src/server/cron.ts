@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { clubs, eventRsvps, events, notifications, otpCodes, posts, rateLimits, sessions, storedFiles, users } from "@/db/schema";
+import { clubs, directMessages, eventRsvps, events, notifications, otpCodes, posts, rateLimits, sessions, storedFiles, users } from "@/db/schema";
 import { formatDateTime } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { sendEmail } from "./email";
@@ -46,6 +46,12 @@ export async function purgeDeleted(now: Date) {
   await store.delete(oldFiles.map((f) => f.path));
   if (oldFiles.length) await db.delete(storedFiles).where(inArray(storedFiles.id, oldFiles.map((f) => f.id)));
 
+  // Unsent private messages are kept 30 days (for reports), then erased. Their images went above.
+  const oldMessages = await db
+    .delete(directMessages)
+    .where(and(isNotNull(directMessages.deletedAt), lt(directMessages.deletedAt, cutoff)))
+    .returning({ id: directMessages.id });
+
   const oldClubs = await db.select({ id: clubs.id }).from(clubs).where(and(isNotNull(clubs.deletedAt), lt(clubs.deletedAt, cutoff)));
   for (const c of oldClubs) {
     const files = await db.select({ id: storedFiles.id, path: storedFiles.storagePath }).from(storedFiles).where(eq(storedFiles.clubId, c.id));
@@ -62,12 +68,14 @@ export async function purgeDeleted(now: Date) {
         eq(users.status, "deleted"),
         sql`not exists (select 1 from posts p where p.author_id = ${users.id})`,
         sql`not exists (select 1 from comments c where c.author_id = ${users.id})`,
+        // Kept while the other person still has the conversation.
+        sql`not exists (select 1 from conversations c where c.starter_id = ${users.id} or c.recipient_id = ${users.id})`,
         sql`not exists (select 1 from group_plans p where p.created_by = ${users.id})`,
         sql`not exists (select 1 from study_groups g where g.owner_id = ${users.id})`,
       ),
     )
     .returning({ id: users.id });
-  return { posts: purgedPosts, groups, files: oldFiles.length, clubs: oldClubs.length, users: removedUsers.length };
+  return { posts: purgedPosts, groups, messages: oldMessages.length, files: oldFiles.length, clubs: oldClubs.length, users: removedUsers.length };
 }
 
 export async function cleanQuarantine(now: Date) {

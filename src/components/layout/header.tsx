@@ -1,18 +1,19 @@
 import Link from "next/link";
-import { Bell, Menu, Plus, Search } from "lucide-react";
+import { Bell, Menu, MessageCircle, Plus, Search } from "lucide-react";
 import type { Actor } from "@/server/actor-types";
 import { ThemeToggle } from "./theme-toggle";
 
 const NAV = [
   { href: "/", label: "Home" },
   { href: "/subjects", label: "Tags" },
+  { href: "/market", label: "Market" },
   { href: "/clubs", label: "Clubs" },
   { href: "/events", label: "Events" },
   { href: "/schedule", label: "Schedule" },
   { href: "/study-groups", label: "Study groups" },
 ];
 
-export function SiteHeader({ actor, unread }: { actor: Actor | null; unread: number }) {
+export function SiteHeader({ actor, unread, unreadMessages = 0 }: { actor: Actor | null; unread: number; unreadMessages?: number }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg">
       <div className="mx-auto flex max-w-content items-center gap-6 px-4 py-3 sm:px-6">
@@ -42,6 +43,10 @@ export function SiteHeader({ actor, unread }: { actor: Actor | null; unread: num
                 <Plus size={16} aria-hidden="true" />
                 <span className="hidden sm:inline">New post</span>
                 <span className="sr-only sm:hidden">New post</span>
+              </Link>
+              <Link href="/messages" className="btn btn-sm" aria-label={`Messages${unreadMessages ? `, ${unreadMessages} new` : ""}`}>
+                <MessageCircle size={16} aria-hidden="true" />
+                {unreadMessages > 0 && <span className="text-sm font-semibold">{unreadMessages > 99 ? "99+" : unreadMessages}</span>}
               </Link>
               <Link href="/notifications" className="btn btn-sm" aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}>
                 <Bell size={16} aria-hidden="true" />

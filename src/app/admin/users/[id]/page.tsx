@@ -44,10 +44,22 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
       <div className="flex items-center gap-4">
         <Avatar userId={u.id} name={u.displayName} hasImage={!!data.avatar?.approvedFileId} size={64} />
         <div>
-          <h1 className="text-xl font-semibold">{u.displayName ?? "(no name)"}</h1>
-          <p className="text-muted">
-            {u.username ? <Link href={`/u/${u.username}`}>@{u.username}</Link> : "Not onboarded"} · {u.email}
-          </p>
+          {data.identity ? (
+            <>
+              <h1 className="text-xl font-semibold">{data.identity.name ?? "(no name)"} (deleted account)</h1>
+              <p className="text-muted">
+                {data.identity.username ? `@${data.identity.username}` : "No username"} · {data.identity.email}
+                {data.identity.deletedAt && ` · deleted ${formatDateTime(data.identity.deletedAt)}`}
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-semibold">{u.displayName ?? "(no name)"}</h1>
+              <p className="text-muted">
+                {u.username ? <Link href={`/u/${u.username}`}>@{u.username}</Link> : "Not onboarded"} · {u.email}
+              </p>
+            </>
+          )}
         </div>
       </div>
       <dl className="card grid grid-cols-2 gap-2 p-4 text-sm sm:grid-cols-3">

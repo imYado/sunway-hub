@@ -22,6 +22,7 @@ import {
   commentVotes,
   comments,
   postVotes,
+  deletedAccounts,
 } from "@/db/schema";
 import { BIO_MAX, DISPLAY_NAME_MAX, USERNAME_CHANGES_PER_WEEK, nextUsernameChange, usernameProblem } from "@/lib/rules";
 import type { Actor } from "../actor-types";
@@ -33,6 +34,7 @@ import { enforce, LIMITS } from "../rate-limit";
 import { recordConsent } from "../legal";
 import { storage } from "../storage";
 import { eraseScheduleData, myScheduleData } from "./groups";
+import { myMessagesForExport } from "./messages";
 import { processSquareImage, storageStatus } from "./uploads";
 import { PURGE_AFTER_DAYS } from "./posts";
 
@@ -298,6 +300,7 @@ export async function exportMyData(actor: Actor) {
     subjectFollows: await db.select().from(subjectFollows).where(eq(subjectFollows.userId, actor.id)),
     clubManagerRequests: await db.select().from(clubManagerRequests).where(eq(clubManagerRequests.userId, actor.id)),
     ...(await myScheduleData(actor.id)),
+    privateMessages: await myMessagesForExport(actor),
     reportsSubmitted: await db.select().from(reports).where(eq(reports.reporterId, actor.id)),
     notifications: await db.select().from(notifications).where(eq(notifications.userId, actor.id)),
     notificationSettings: await db.select().from(notificationSettings).where(eq(notificationSettings.userId, actor.id)),
@@ -325,6 +328,21 @@ export async function eraseUser(userId: string, mode: "delete_posts" | "anonymis
   const now = new Date();
   const purgeNote = mode === "delete_posts" ? "Account deleted" : null;
   await db.transaction(async (tx) => {
+    // Kept for the admin only, so reported content can still be traced to a person.
+    await tx
+      .insert(deletedAccounts)
+      .values({
+        userId,
+        email: u.email,
+        username: u.username,
+        displayName: u.displayName,
+        roleLabel: u.roleLabel,
+        joinedAt: u.createdAt,
+        deletedAt: now,
+        deletedBy: by?.id ?? userId,
+        reason: reason ?? null,
+      })
+      .onConflictDoNothing();
     if (mode === "delete_posts") {
       await tx
         .update(posts)
@@ -373,6 +391,26 @@ export async function eraseUser(userId: string, mode: "delete_posts" | "anonymis
     mode,
     purgeAfterDays: PURGE_AFTER_DAYS,
   });
+}
+
+/**
+ * Who an account belongs to, for the admin. Deleted accounts come from the archive kept
+ * at deletion, so the admin still sees the original email and name.
+ */
+export async function identityForAdmin(userId: string) {
+  const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const [archived] = await db.select().from(deletedAccounts).where(eq(deletedAccounts.userId, userId)).limit(1);
+  if (archived) {
+    return { id: userId, email: archived.email, username: archived.username, name: archived.displayName, status: "deleted", deletedAt: archived.deletedAt as Date | null };
+  }
+  return {
+    id: userId,
+    email: u?.email ?? "(unknown)",
+    username: u?.username ?? null,
+    name: u?.displayName ?? null,
+    status: u?.status ?? "deleted",
+    deletedAt: u?.deletedAt ?? null,
+  };
 }
 
 export async function deleteMyAccount(actor: Actor, code: string, mode: "delete_posts" | "anonymise_posts") {

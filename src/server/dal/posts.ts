@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/db";
@@ -20,7 +20,7 @@ import {
 } from "@/db/schema";
 import { parseKlInput } from "@/lib/dates";
 import { MAX_FILES_PER_POST } from "@/lib/files";
-import type { PostType } from "@/lib/rules";
+import type { MarketKind, PostType } from "@/lib/rules";
 import {
   DESCRIPTION_MAX,
   LINK_LABEL_MAX,
@@ -87,7 +87,8 @@ export async function suggestSubjects(q: string, limit = 8) {
 // ---------------------------------------------------------------------------
 export const createPostSchema = z
   .object({
-    type: z.enum(["discussion", "study", "event", "club"]),
+    type: z.enum(["discussion", "study", "event", "club", "market"]),
+    marketKind: z.enum(["sell", "buy", "swap", "borrow"]).optional().or(z.literal("").transform(() => undefined)),
     title: titleSchema,
     description: z.string().trim().max(DESCRIPTION_MAX, `Descriptions can be at most ${DESCRIPTION_MAX} characters.`).default(""),
     subjects: z.array(z.string().trim().min(1).max(80)).max(MAX_TAGS).default([]),
@@ -130,6 +131,9 @@ export const createPostSchema = z
     if (v.type === "club" && !v.clubId) ctx.addIssue({ code: "custom", message: "Choose the club this post is for.", path: ["clubId"] });
     if (v.type === "club" && v.anonymous) {
       ctx.addIssue({ code: "custom", message: "Club posts can't be anonymous.", path: ["anonymous"] });
+    }
+    if (v.type === "market" && !v.marketKind) {
+      ctx.addIssue({ code: "custom", message: "Choose whether you're selling, buying, swapping or lending.", path: ["marketKind"] });
     }
     if (v.type === "study" && v.subjects.length === 0) {
       ctx.addIssue({ code: "custom", message: "Add at least one tag, like the course code.", path: ["subjects"] });
@@ -188,6 +192,7 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
         clubId: input.clubId ?? null,
         links,
         anonymous: input.anonymous,
+        marketKind: input.type === "market" ? (input.marketKind ?? null) : null,
         status: autoApproved ? "approved" : "pending",
         decidedAt: autoApproved ? new Date() : null,
         decidedBy: autoApproved ? actor.id : null,
@@ -228,6 +233,7 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
 export interface PostCard {
   id: string;
   type: PostType;
+  marketKind: MarketKind | null;
   title: string;
   description: string;
   semester: string | null;
@@ -255,6 +261,7 @@ export interface PostCard {
 const cardSelect = {
   id: posts.id,
   type: posts.type,
+  marketKind: posts.marketKind,
   title: posts.title,
   description: posts.description,
   semester: posts.semester,
@@ -309,6 +316,7 @@ async function hydrateCards(actor: Actor, rows: CardRow[]): Promise<PostCard[]> 
     return {
       id: r.id as string,
       type: r.type as PostCard["type"],
+      marketKind: (r.marketKind as MarketKind | null) ?? null,
       title: r.title as string,
       description: r.description as string,
       semester: r.semester as string | null,
@@ -374,6 +382,9 @@ const hotRank = sql`(sign(${posts.score}) * log(greatest(abs(${posts.score}), 1)
 export interface SearchFilters {
   q?: string;
   type?: PostType;
+  /** Leave these types out (the home page skips Market posts). */
+  excludeTypes?: PostType[];
+  marketKind?: MarketKind;
   subject?: string; // tag (subject) slug
   semester?: string;
   verifiedTeacher?: boolean;
@@ -391,6 +402,8 @@ export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ ite
     conds.push(sql`(${posts.search} @@ websearch_to_tsquery('english', ${q}) or ${posts.title} % ${q} or ${posts.subjectText} ilike ${"%" + q.replace(/[%_\\]/g, "\\$&") + "%"})`);
   }
   if (f.type) conds.push(eq(posts.type, f.type));
+  if (f.excludeTypes?.length) conds.push(notInArray(posts.type, f.excludeTypes));
+  if (f.marketKind) conds.push(eq(posts.marketKind, f.marketKind));
   if (f.semester) conds.push(eq(posts.semester, f.semester));
   // Anonymous posts never match, or the filter would reveal that a teacher wrote them.
   if (f.verifiedTeacher) conds.push(eq(users.teacherVerified, true), eq(posts.anonymous, false));
@@ -424,8 +437,14 @@ export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ ite
   return { items: await hydrateCards(actor, rows), total, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
+/** The home page: every kind of post except Market listings, which have their own page. */
 export async function listFeed(actor: Actor, opts: { page?: number; type?: PostType; sort?: PostSort } = {}) {
-  return searchPosts(actor, { page: opts.page ?? 1, type: opts.type, sort: opts.sort ?? "hot" });
+  const type = opts.type === "market" ? undefined : opts.type;
+  return searchPosts(actor, { page: opts.page ?? 1, type, excludeTypes: ["market"], sort: opts.sort ?? "hot" });
+}
+
+export async function listMarket(actor: Actor, opts: { page?: number; kind?: MarketKind; sort?: PostSort } = {}) {
+  return searchPosts(actor, { page: opts.page ?? 1, type: "market", marketKind: opts.kind, sort: opts.sort ?? "new" });
 }
 
 export type ProfileTab = "posts" | "pending" | "rejected" | "bookmarks";
@@ -638,6 +657,7 @@ export async function editPost(actor: Actor, postId: string, raw: EditPostInput)
           clubId: input.clubId ?? null,
           links,
           anonymous: input.anonymous,
+          marketKind: post.type === "market" ? (input.marketKind ?? null) : null,
           titleEdited: post.titleEdited || input.title !== post.title,
           editedAt: now,
           updatedAt: now,

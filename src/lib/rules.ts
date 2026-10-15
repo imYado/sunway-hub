@@ -115,9 +115,28 @@ export const POST_TYPES = [
   { value: "study", label: "Notes" },
   { value: "event", label: "Event" },
   { value: "club", label: "Club Post" },
+  { value: "market", label: "Market" },
 ] as const;
 export type PostType = (typeof POST_TYPES)[number]["value"];
 export const POST_TYPE_LABEL: Record<PostType, string> = Object.fromEntries(POST_TYPES.map((t) => [t.value, t.label])) as Record<PostType, string>;
+
+/** Market posts are left off the home page; they have their own page. */
+export const HOME_POST_TYPES = POST_TYPES.filter((t) => t.value !== "market");
+
+export const MARKET_KINDS = [
+  { value: "sell", label: "Selling" },
+  { value: "buy", label: "Looking to buy" },
+  { value: "swap", label: "Swap" },
+  { value: "borrow", label: "Borrow or lend" },
+] as const;
+export type MarketKind = (typeof MARKET_KINDS)[number]["value"];
+export const MARKET_KIND_LABEL: Record<MarketKind, string> = Object.fromEntries(MARKET_KINDS.map((k) => [k.value, k.label])) as Record<MarketKind, string>;
+
+// Private messages.
+export const DM_MAX = 2000;
+export const DM_REQUESTS_PER_DAY = 20;
+/** A declined requester may ask again after this many days. */
+export const DM_RETRY_AFTER_DAYS = 7;
 
 export const REPORT_REASONS = [
   { value: "copyright", label: "Copyright" },

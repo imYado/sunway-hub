@@ -11,12 +11,13 @@ import { assertClean } from "../profanity";
 import { enforce, LIMITS } from "../rate-limit";
 import { describeComment, setCommentHidden } from "./comments";
 import { describeGroup, setGroupHidden } from "./groups";
+import { describeMessage } from "./messages";
 import { canViewPost } from "./policy";
 
 export const AUTO_HIDE_THRESHOLD = 3;
 
 export const reportSchema = z.object({
-  targetType: z.enum(["post", "user", "club", "study_group", "comment"]),
+  targetType: z.enum(["post", "user", "club", "study_group", "comment", "message"]),
   targetId: z.string().uuid(),
   reason: z.enum(["copyright", "inappropriate", "harassment", "exam_material", "spam", "other"]),
   note: z.string().trim().max(REPORT_NOTE_MAX).optional().default(""),
@@ -41,6 +42,11 @@ export async function createReport(actor: Actor, raw: z.input<typeof reportSchem
     const [p] = await db.select().from(posts).where(eq(posts.id, c.postId)).limit(1);
     if (!p || !canViewPost(actor, p)) throw new NotFoundError();
     if (c.authorId === actor.id) throw new AppError("You cannot report your own comment.");
+  } else if (input.targetType === "message") {
+    // Only someone in the conversation can report a message, and not their own.
+    const m = await describeMessage(input.targetId);
+    if (!m || (m.starterId !== actor.id && m.recipientId !== actor.id)) throw new NotFoundError();
+    if (m.senderId === actor.id) throw new AppError("You cannot report your own message.");
   } else if (input.targetType === "user") {
     const [u] = await db.select().from(users).where(eq(users.id, input.targetId)).limit(1);
     if (!u || u.status === "deleted") throw new NotFoundError();
@@ -72,6 +78,8 @@ export async function createReport(actor: Actor, raw: z.input<typeof reportSchem
 export type ReportTarget = z.infer<typeof reportSchema>["targetType"];
 
 export async function setHidden(targetType: ReportTarget, targetId: string, hidden: boolean) {
+  // Private messages are never auto-hidden: only the other person can see them anyway.
+  if (targetType === "message") return;
   if (targetType === "study_group") {
     await setGroupHidden(targetId, hidden);
   } else if (targetType === "post") {

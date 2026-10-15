@@ -43,4 +43,5 @@ export const LIMITS = {
   writePerUser: { limit: 60, window: 3600 },
   votePerUser: { limit: 300, window: 3600 },
   commentPerUser: { limit: 60, window: 3600 },
+  dmPerUser: { limit: 300, window: 3600 },
 } as const;

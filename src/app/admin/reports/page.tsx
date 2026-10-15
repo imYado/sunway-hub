@@ -31,7 +31,7 @@ export default async function ReportsPage() {
               <ul className="mt-2 space-y-1 text-sm">
                 {g.items.map((r) => (
                   <li key={r.id}>
-                    {formatDateTime(r.createdAt)} · {REASON[r.reason]} · by {r.reporter ? `@${r.reporter}` : "deleted user"}
+                    {formatDateTime(r.createdAt)} · {REASON[r.reason]} · by {r.reporter ?? "unknown"}
                     {r.note && <span className="block text-muted">&quot;{r.note}&quot;</span>}
                   </li>
                 ))}

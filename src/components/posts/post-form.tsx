@@ -12,6 +12,7 @@ import {
   LINK_LABEL_MAX,
   LINK_URL_MAX,
   MAX_LINKS_PER_POST,
+  MARKET_KINDS,
   MAX_TAGS,
   POST_TYPES,
   TITLE_MAX,
@@ -25,6 +26,7 @@ import { createPostAction, editPostAction } from "@/app/actions/posts";
 export interface EditablePost {
   id: string;
   type: PostType;
+  marketKind: string | null;
   title: string;
   description: string;
   tags: string[];
@@ -180,6 +182,7 @@ export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, sto
         description,
         subjects: allTags,
         semester: String(fd.get("semester") ?? ""),
+        marketKind: type === "market" ? (String(fd.get("marketKind") ?? "") as "sell") : undefined,
         clubId: String(fd.get("clubId") ?? ""),
         links: allLinks,
         anonymous: type !== "club" && fd.get("anonymous") === "on",
@@ -228,6 +231,27 @@ export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, sto
           ))}
         </div>
       </fieldset>
+      )}
+
+      {type === "market" && (
+        <fieldset className="mb-4">
+          <legend className="label">What are you doing?</legend>
+          <div className="flex flex-wrap gap-4">
+            {MARKET_KINDS.map((k, i) => (
+              <label key={k.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="marketKind"
+                  value={k.value}
+                  required
+                  defaultChecked={post?.marketKind ? post.marketKind === k.value : i === 0}
+                  className="h-4 w-4"
+                />
+                {k.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       )}
 
       <div className="mb-4">

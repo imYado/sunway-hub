@@ -45,12 +45,14 @@ export const roleLabelEnum = pgEnum("role_label", ["student", "teacher", "other"
 export const userStatusEnum = pgEnum("user_status", ["active", "suspended", "banned", "deleted"]);
 export const otpPurposeEnum = pgEnum("otp_purpose", ["login", "admin_setup", "admin_reset", "delete_account"]);
 export const sessionStageEnum = pgEnum("session_stage", ["active", "needs_password", "needs_totp"]);
-export const postTypeEnum = pgEnum("post_type", ["study", "event", "club", "discussion"]);
+export const postTypeEnum = pgEnum("post_type", ["study", "event", "club", "discussion", "market"]);
+export const marketKindEnum = pgEnum("market_kind", ["sell", "buy", "swap", "borrow"]);
 export const postStatusEnum = pgEnum("post_status", ["pending", "approved", "rejected", "changes_requested"]);
 export const fileKindEnum = pgEnum("file_kind", ["image", "pdf", "docx", "pptx", "video"]);
-export const storedFilePurposeEnum = pgEnum("stored_file_purpose", ["attachment", "avatar", "club_logo", "comment_attachment"]);
+export const storedFilePurposeEnum = pgEnum("stored_file_purpose", ["attachment", "avatar", "club_logo", "comment_attachment", "dm_image"]);
 export const imageReviewStatusEnum = pgEnum("image_review_status", ["pending", "approved", "rejected"]);
-export const reportTargetEnum = pgEnum("report_target", ["post", "user", "club", "study_group", "comment"]);
+export const reportTargetEnum = pgEnum("report_target", ["post", "user", "club", "study_group", "comment", "message"]);
+export const dmStatusEnum = pgEnum("dm_status", ["pending", "accepted", "declined", "blocked"]);
 export const reportReasonEnum = pgEnum("report_reason", [
   "copyright",
   "inappropriate",
@@ -205,6 +207,7 @@ export const storedFiles = pgTable(
     purpose: storedFilePurposeEnum("purpose").notNull(),
     postId: uuid("post_id").references(() => posts.id, { onDelete: "cascade" }),
     commentId: uuid("comment_id").references(() => comments.id, { onDelete: "cascade" }),
+    messageId: uuid("message_id").references(() => directMessages.id, { onDelete: "cascade" }),
     clubId: uuid("club_id"),
     storagePath: text("storage_path").notNull().unique(),
     originalName: text("original_name").notNull(),
@@ -215,6 +218,8 @@ export const storedFiles = pgTable(
     width: integer("width"),
     height: integer("height"),
     position: integer("position").notNull().default(0),
+    // DM images are stored AES-256-GCM encrypted and decrypted only when a participant views them.
+    encrypted: boolean("encrypted").notNull().default(false),
     // For avatars and club logos: review state. Attachments follow their post's status.
     reviewStatus: imageReviewStatusEnum("review_status"),
     reviewReason: text("review_reason"),
@@ -226,6 +231,7 @@ export const storedFiles = pgTable(
   (t) => [
     index("stored_files_post").on(t.postId),
     index("stored_files_comment").on(t.commentId),
+    index("stored_files_message").on(t.messageId),
     index("stored_files_sha").on(t.sha256),
     index("stored_files_owner").on(t.ownerId, t.purpose),
   ],
@@ -372,6 +378,8 @@ export const posts = pgTable(
     clubId: uuid("club_id").references(() => clubs.id, { onDelete: "set null" }),
     // External links shared in the post, shown under the description.
     links: jsonb("links").$type<PostLink[]>().notNull().default([]),
+    // Market posts only: what the poster wants to do.
+    marketKind: marketKindEnum("market_kind"),
     // Shown as "Anonymous" to everyone except the poster and the admin.
     anonymous: boolean("anonymous").notNull().default(false),
     status: postStatusEnum("status").notNull().default("pending"),
@@ -737,3 +745,78 @@ export const groupPlanAttendees = pgTable(
   },
   (t) => [primaryKey({ columns: [t.planId, t.userId] })],
 );
+
+// ---------------------------------------------------------------------------
+// Private messages
+// ---------------------------------------------------------------------------
+
+// A conversation starts as a request that the recipient must accept. The starter is never
+// anonymous. When someone messages the poster of an anonymous post, the recipient stays
+// hidden from the starter until the recipient chooses to show their name.
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    starterId: uuid("starter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    recipientId: uuid("recipient_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // The post the conversation is about, if it was started from one.
+    postId: uuid("post_id").references(() => posts.id, { onDelete: "set null" }),
+    postTitle: text("post_title"),
+    recipientAnonymous: boolean("recipient_anonymous").notNull().default(false),
+    recipientRevealed: boolean("recipient_revealed").notNull().default(false),
+    status: dmStatusEnum("status").notNull().default("pending"),
+    blockedBy: uuid("blocked_by"),
+    respondedAt: ts("responded_at"),
+    lastMessageAt: ts("last_message_at").notNull().defaultNow(),
+    lastSenderId: uuid("last_sender_id"),
+    starterReadAt: ts("starter_read_at"),
+    recipientReadAt: ts("recipient_read_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("conversations_starter").on(t.starterId, t.lastMessageAt),
+    index("conversations_recipient").on(t.recipientId, t.lastMessageAt),
+    // One named conversation per pair of people, and one anonymous one per person per post.
+    uniqueIndex("conversations_named_pair")
+      .on(sql`least(${t.starterId}, ${t.recipientId})`, sql`greatest(${t.starterId}, ${t.recipientId})`)
+      .where(sql`recipient_anonymous = false`),
+    uniqueIndex("conversations_anonymous_post").on(t.starterId, t.recipientId, t.postId).where(sql`recipient_anonymous = true`),
+  ],
+);
+
+// Message text is AES-256-GCM encrypted at rest. Only the two participants can read it,
+// and the admin only once someone in the conversation has reported a message.
+export const directMessages = pgTable(
+  "direct_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    senderId: uuid("sender_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bodyEnc: text("body_enc").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    deletedAt: ts("deleted_at"),
+  },
+  (t) => [index("direct_messages_conversation").on(t.conversationId, t.createdAt)],
+);
+
+// Kept when an account is deleted, so the admin can still identify who was behind reported
+// content. Only the admin can read it. Described in the Privacy Policy.
+export const deletedAccounts = pgTable("deleted_accounts", {
+  userId: uuid("user_id").primaryKey(),
+  email: text("email").notNull(),
+  username: text("username"),
+  displayName: text("display_name"),
+  roleLabel: roleLabelEnum("role_label"),
+  joinedAt: ts("joined_at"),
+  deletedAt: ts("deleted_at").notNull().defaultNow(),
+  deletedBy: uuid("deleted_by"),
+  reason: text("reason"),
+});
