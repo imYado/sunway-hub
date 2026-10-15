@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, FileText, ThumbsUp } from "lucide-react";
+import { CalendarDays, FileText, Link2, ThumbsUp } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import type { PostCard as PostCardData } from "@/server/dal/posts";
 
@@ -13,11 +13,13 @@ export function StatusBadge({ status }: { status: PostCardData["status"] }) {
 }
 
 export function AuthorName({ author }: { author: PostCardData["author"] }) {
+  if (author.anonymous && !author.id) return <span className="text-muted">Anonymous</span>;
   if (author.deleted || !author.username) return <span className="text-muted">Deleted user</span>;
   return (
     <span>
       <Link href={`/u/${author.username}`}>{author.displayName ?? `@${author.username}`}</Link>
       {author.verifiedTeacher && <span className="badge ml-2">Verified teacher</span>}
+      {author.anonymous && <span className="badge ml-2">Shown as Anonymous</span>}
     </span>
   );
 }
@@ -64,6 +66,12 @@ export function PostCard({ post, showStatus = false }: { post: PostCardData; sho
           <span className="flex items-center gap-1">
             <FileText size={14} aria-hidden="true" />
             {post.fileCount} file{post.fileCount === 1 ? "" : "s"}
+          </span>
+        )}
+        {post.links.length > 0 && (
+          <span className="flex items-center gap-1">
+            <Link2 size={14} aria-hidden="true" />
+            {post.links.length} link{post.links.length === 1 ? "" : "s"}
           </span>
         )}
         <span className="flex items-center gap-1">

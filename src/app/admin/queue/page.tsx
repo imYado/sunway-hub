@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { EmptyState, PageTitle } from "@/components/ui/empty";
 import { QueueShortcuts } from "@/components/admin/queue-shortcuts";
+import { PostLinks } from "@/components/posts/post-links";
 import { formatDateTime } from "@/lib/dates";
 import { formatBytes } from "@/lib/files";
 import { bulkDecideAction, decideAvatarAction, decideLogoAction, decidePostAction } from "@/app/actions/admin";
@@ -49,6 +50,7 @@ export default async function QueuePage() {
                     <span>
                       by {p.username ? <Link href={`/u/${p.username}`}>@{p.username}</Link> : "unknown"}
                       {p.teacherVerified && " (verified teacher)"}
+                      {p.anonymous && " (shown as Anonymous)"}
                     </span>
                   </div>
                   <h3 className="mt-2 text-lg font-semibold">
@@ -66,6 +68,7 @@ export default async function QueuePage() {
                     </p>
                   )}
                   {p.description && <p className="mt-2 whitespace-pre-wrap break-words text-sm">{p.description}</p>}
+                  {p.links.length > 0 && <PostLinks links={p.links} className="mt-3" />}
                   {p.files.length > 0 && (
                     <ul className="mt-3 grid gap-3 sm:grid-cols-2">
                       {p.files.map((f) => (

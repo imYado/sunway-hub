@@ -12,7 +12,14 @@ export async function leaderboard(limit = 50) {
     .from(users)
     .innerJoin(
       posts,
-      and(eq(posts.authorId, users.id), eq(posts.status, "approved"), eq(posts.hiddenByReports, false), isNull(posts.deletedAt)),
+      and(
+        eq(posts.authorId, users.id),
+        eq(posts.status, "approved"),
+        eq(posts.hiddenByReports, false),
+        isNull(posts.deletedAt),
+        // Anonymous posts would otherwise give away who wrote them.
+        eq(posts.anonymous, false),
+      ),
     )
     .where(and(eq(users.showOnLeaderboard, true), eq(users.status, "active"), eq(users.hiddenByReports, false)))
     .groupBy(users.id)

@@ -12,13 +12,23 @@ import {
   postSubjects,
   postTitleHistory,
   posts,
+  type PostLink,
   storedFiles,
   subjects,
   users,
 } from "@/db/schema";
 import { parseKlInput } from "@/lib/dates";
 import { MAX_FILES_PER_POST } from "@/lib/files";
-import { DESCRIPTION_MAX, MAX_SUBJECT_TAGS, SEMESTER_RE, slugify, titleSchema } from "@/lib/rules";
+import {
+  DESCRIPTION_MAX,
+  LINK_LABEL_MAX,
+  MAX_LINKS_PER_POST,
+  MAX_SUBJECT_TAGS,
+  SEMESTER_RE,
+  cleanLinkUrl,
+  slugify,
+  titleSchema,
+} from "@/lib/rules";
 import type { Actor } from "../actor-types";
 import { audit } from "../audit";
 import { AppError, ForbiddenError, NotFoundError } from "../errors";
@@ -84,6 +94,20 @@ export const createPostSchema = z
       .optional()
       .or(z.literal("").transform(() => undefined)),
     clubId: z.string().uuid().optional().or(z.literal("").transform(() => undefined)),
+    links: z
+      .array(
+        z.object({
+          url: z.string().transform((v, ctx) => {
+            const url = cleanLinkUrl(v);
+            if (!url) ctx.addIssue({ code: "custom", message: `"${v.slice(0, 60)}" is not a valid web link.` });
+            return url ?? "";
+          }),
+          label: z.string().trim().max(LINK_LABEL_MAX, `Link names can be at most ${LINK_LABEL_MAX} characters.`).default(""),
+        }),
+      )
+      .max(MAX_LINKS_PER_POST, `You can add up to ${MAX_LINKS_PER_POST} links.`)
+      .default([]),
+    anonymous: z.boolean().default(false),
     ownWork: z.literal(true, { errorMap: () => ({ message: "Please confirm that you have the right to share this." }) }),
     files: z
       .array(z.object({ pathname: z.string().min(1).max(500), name: z.string().min(1).max(200) }))
@@ -101,6 +125,9 @@ export const createPostSchema = z
   .superRefine((v, ctx) => {
     if (v.type === "event" && !v.event) ctx.addIssue({ code: "custom", message: "Events need a date, time and location.", path: ["event"] });
     if (v.type === "club" && !v.clubId) ctx.addIssue({ code: "custom", message: "Choose the club this post is for.", path: ["clubId"] });
+    if (v.type === "club" && v.anonymous) {
+      ctx.addIssue({ code: "custom", message: "Club posts can't be anonymous.", path: ["anonymous"] });
+    }
     if (v.type === "study" && v.subjects.length === 0) {
       ctx.addIssue({ code: "custom", message: "Add at least one subject tag.", path: ["subjects"] });
     }
@@ -111,7 +138,8 @@ export type CreatePostInput = z.input<typeof createPostSchema>;
 export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ id: string; status: string }> {
   const input = createPostSchema.parse(raw);
   await enforce("write", actor.id, LIMITS.writePerUser.limit, LIMITS.writePerUser.window);
-  await assertClean(input.title, input.description, ...input.subjects, input.event?.location);
+  const links: PostLink[] = input.links.map((l) => ({ url: l.url, label: l.label || new URL(l.url).hostname.replace(/^www\./, "") }));
+  await assertClean(input.title, input.description, ...input.subjects, input.event?.location, ...links.map((l) => l.label));
 
   if (input.clubId) {
     const [club] = await db.select({ id: clubs.id }).from(clubs).where(and(eq(clubs.id, input.clubId), isNull(clubs.deletedAt))).limit(1);
@@ -145,6 +173,8 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
         subjectText: subjectRows.map((s) => s.name).join(" "),
         semester: input.semester ?? null,
         clubId: input.clubId ?? null,
+        links,
+        anonymous: input.anonymous,
         status: autoApproved ? "approved" : "pending",
         decidedAt: autoApproved ? new Date() : null,
         decidedBy: autoApproved ? actor.id : null,
@@ -194,11 +224,13 @@ export interface PostCard {
   hiddenByReports: boolean;
   deletedAt: Date | null;
   decisionReason: string | null;
-  author: { id: string; username: string | null; displayName: string | null; deleted: boolean; verifiedTeacher: boolean };
+  /** For anonymous posts, only the poster and the admin see who wrote it. */
+  author: { id: string; username: string | null; displayName: string | null; deleted: boolean; verifiedTeacher: boolean; anonymous: boolean };
   club: { slug: string; name: string } | null;
   subjects: { name: string; slug: string }[];
   event: { startsAt: Date; endsAt: Date | null; location: string } | null;
   fileCount: number;
+  links: PostLink[];
 }
 
 const cardSelect = {
@@ -214,6 +246,8 @@ const cardSelect = {
   hiddenByReports: posts.hiddenByReports,
   deletedAt: posts.deletedAt,
   decisionReason: posts.decisionReason,
+  links: posts.links,
+  anonymous: posts.anonymous,
   authorId: users.id,
   authorUsername: users.username,
   authorName: users.displayName,
@@ -230,7 +264,7 @@ type CardRow = {
   [K in keyof typeof cardSelect]: unknown;
 };
 
-async function hydrateCards(rows: CardRow[]): Promise<PostCard[]> {
+async function hydrateCards(actor: Actor, rows: CardRow[]): Promise<PostCard[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id as string);
   const subjectRows = await db
@@ -245,6 +279,8 @@ async function hydrateCards(rows: CardRow[]): Promise<PostCard[]> {
     .groupBy(storedFiles.postId);
   return rows.map((r) => {
     const deleted = r.authorStatus === "deleted";
+    const anonymous = r.anonymous as boolean;
+    const masked = anonymous && !actor.isAdmin && actor.id !== r.authorId;
     return {
       id: r.id as string,
       type: r.type as PostCard["type"],
@@ -258,19 +294,23 @@ async function hydrateCards(rows: CardRow[]): Promise<PostCard[]> {
       hiddenByReports: r.hiddenByReports as boolean,
       deletedAt: r.deletedAt as Date | null,
       decisionReason: r.decisionReason as string | null,
-      author: {
-        id: r.authorId as string,
-        username: deleted ? null : (r.authorUsername as string | null),
-        displayName: deleted ? "Deleted user" : (r.authorName as string | null),
-        deleted,
-        verifiedTeacher: !deleted && (r.authorTeacher as boolean),
-      },
+      author: masked
+        ? { id: "", username: null, displayName: null, deleted: false, verifiedTeacher: false, anonymous: true }
+        : {
+            id: r.authorId as string,
+            username: deleted ? null : (r.authorUsername as string | null),
+            displayName: deleted ? "Deleted user" : (r.authorName as string | null),
+            deleted,
+            verifiedTeacher: !deleted && (r.authorTeacher as boolean),
+            anonymous,
+          },
       club: r.clubSlug ? { slug: r.clubSlug as string, name: r.clubName as string } : null,
       subjects: subjectRows.filter((s) => s.postId === r.id).map((s) => ({ name: s.name, slug: s.slug })),
       event: r.eventStartsAt
         ? { startsAt: r.eventStartsAt as Date, endsAt: r.eventEndsAt as Date | null, location: r.eventLocation as string }
         : null,
       fileCount: Number(fileCounts.find((f) => f.postId === r.id)?.n ?? 0),
+      links: (r.links as PostLink[] | null) ?? [],
     };
   });
 }
@@ -310,7 +350,8 @@ export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ ite
   }
   if (f.type) conds.push(eq(posts.type, f.type));
   if (f.semester) conds.push(eq(posts.semester, f.semester));
-  if (f.verifiedTeacher) conds.push(eq(users.teacherVerified, true));
+  // Anonymous posts never match, or the filter would reveal that a teacher wrote them.
+  if (f.verifiedTeacher) conds.push(eq(users.teacherVerified, true), eq(posts.anonymous, false));
   if (f.club) conds.push(eq(clubs.slug, f.club));
   if (f.subject) {
     conds.push(
@@ -336,7 +377,7 @@ export async function searchPosts(actor: Actor, f: SearchFilters): Promise<{ ite
     .orderBy(...order)
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
-  return { items: await hydrateCards(rows), total, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
+  return { items: await hydrateCards(actor, rows), total, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
 export async function listFeed(actor: Actor, page = 1) {
@@ -355,11 +396,11 @@ export async function listProfilePosts(actor: Actor, userId: string, tab: Profil
       .where(publicCondition())
       .orderBy(desc(bookmarks.createdAt))
       .limit(100);
-    return hydrateCards(rows);
+    return hydrateCards(actor, rows);
   }
   const cond =
     tab === "posts"
-      ? and(eq(posts.authorId, userId), publicCondition())
+      ? and(eq(posts.authorId, userId), publicCondition(), own ? undefined : eq(posts.anonymous, false))
       : tab === "pending"
         ? and(eq(posts.authorId, userId), isNull(posts.deletedAt), eq(posts.status, "pending"))
         : and(
@@ -368,7 +409,7 @@ export async function listProfilePosts(actor: Actor, userId: string, tab: Profil
             or(eq(posts.status, "rejected"), eq(posts.status, "changes_requested")),
           );
   const rows = await baseCardQuery().where(cond).orderBy(desc(posts.createdAt)).limit(100);
-  return hydrateCards(rows);
+  return hydrateCards(actor, rows);
 }
 
 export interface PostDetail extends PostCard {
@@ -395,7 +436,7 @@ export async function getPostDetail(actor: Actor, postId: string): Promise<PostD
   const [post] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
   assertCanViewPost(actor, post);
   const p = post as PostRow;
-  const [card] = await hydrateCards(await baseCardQuery().where(eq(posts.id, postId)).limit(1));
+  const [card] = await hydrateCards(actor, await baseCardQuery().where(eq(posts.id, postId)).limit(1));
   const files = await db
     .select()
     .from(storedFiles)
@@ -433,7 +474,7 @@ export async function getPostDetail(actor: Actor, postId: string): Promise<PostD
     : [];
   return {
     ...card,
-    authorId: p.authorId,
+    authorId: card.author.id,
     clubId: p.clubId,
     decisionReason: p.authorId === actor.id || actor.isAdmin ? p.decisionReason : null,
     files: files.map((f) => ({

@@ -90,6 +90,8 @@ export async function pendingPosts(actor: Actor) {
       subjectText: posts.subjectText,
       createdAt: posts.createdAt,
       titleEdited: posts.titleEdited,
+      links: posts.links,
+      anonymous: posts.anonymous,
       authorId: users.id,
       username: users.username,
       displayName: users.displayName,

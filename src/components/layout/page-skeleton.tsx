@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/empty";
 
 export function PageSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading">
+    <div role="status" aria-busy="true" aria-label="Loading">
       <Skeleton className="mb-6 h-8 w-40" />
       {[0, 1, 2].map((i) => (
         <div key={i} className="card mb-4 p-4">

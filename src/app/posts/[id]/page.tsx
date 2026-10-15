@@ -6,6 +6,7 @@ import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { CleanInput, CleanTextarea } from "@/components/ui/clean-input";
 import { CopyLinkButton } from "@/components/ui/copy-link";
 import { AuthorName, StatusBadge } from "@/components/posts/post-card";
+import { PostLinks } from "@/components/posts/post-links";
 import { ReportForm } from "@/components/report-form";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatBytes } from "@/lib/files";
@@ -107,6 +108,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       )}
 
       {post.description && <p className="mt-4 whitespace-pre-wrap break-words">{post.description}</p>}
+      {post.links.length > 0 && <PostLinks links={post.links} className="mt-4" />}
 
       {images.length > 0 && (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
