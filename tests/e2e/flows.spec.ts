@@ -10,13 +10,39 @@ const BOB = "bob@sunway.edu.my";
 const ERIN = "erin@imail.sunway.edu.my";
 let postUrl = "";
 
-test("logged-out visitors only see public pages", async ({ page }) => {
+test("first visit opens in guest mode with a sign-in popup", async ({ page, context }) => {
   await page.goto("/");
+  await expect(page).toHaveURL(/\/$/);
+  const welcome = page.getByRole("dialog", { name: "Welcome" });
+  await expect(welcome).toBeVisible();
+  await expect(page.getByRole("region", { name: "Guest mode" })).toBeAttached();
+  const axe = await new AxeBuilder({ page: page as never }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => v.id)).toEqual([]);
+  // Sign in goes to the sign-in page.
+  await welcome.getByRole("link", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+  // Escape, like the guest button, keeps browsing as a guest and the popup stays away.
+  await page.goto("/market");
+  await ready(page);
+  await expect(page.getByRole("dialog", { name: "Welcome" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Welcome" })).toHaveCount(0);
+  await expect.poll(async () => (await context.cookies()).some((c) => c.name === "sh_guest")).toBe(true);
+  await page.goto("/");
+  await expect(page.getByRole("region", { name: "Guest mode" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Welcome" })).toHaveCount(0);
+  // Members-only pages still ask to sign in, and come back afterwards.
+  await page.goto("/messages");
+  await expect(page).toHaveURL(/\/login\?next=%2Fmessages/);
+});
+
+test("logged-out visitors can read the public pages", async ({ page }) => {
   for (const path of ["/terms", "/privacy", "/guidelines", "/copyright", "/contact"]) {
     const res = await page.goto(path);
     expect(res?.status()).toBe(200);
     await expect(page.getByText("not affiliated with or endorsed by Sunway University").first()).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Welcome" })).toHaveCount(0);
   }
   const api = await page.request.get("/api/subjects");
   expect(api.status()).toBe(401);

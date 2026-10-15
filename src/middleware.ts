@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// Pages that logged-out visitors may see. Everything else is members-only.
-const PUBLIC_PATHS = ["/login", "/terms", "/privacy", "/guidelines", "/copyright", "/contact"];
-const PUBLIC_API = ["/api/cron/", "/api/auth/microsoft"];
+// API routes that work without a session. Read-only file and calendar routes check for
+// themselves what a guest may see. Pages are always let through: a visitor without a
+// session browses as a guest, and members-only pages redirect to /login on the server.
+const PUBLIC_API = ["/api/cron/", "/api/auth/microsoft", "/api/files/", "/api/events/"];
 
 const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-sh_session" : "sh_session";
 
-function isPublic(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) || PUBLIC_API.some((p) => pathname.startsWith(p));
+function isPublicApi(pathname: string): boolean {
+  return PUBLIC_API.some((p) => pathname.startsWith(p));
 }
 
 function buildCsp(nonce: string): string {
@@ -33,21 +34,15 @@ function buildCsp(nonce: string): string {
 }
 
 export function middleware(req: NextRequest) {
-  const { pathname, search } = req.nextUrl;
+  const { pathname } = req.nextUrl;
   const hasSession = !!req.cookies.get(SESSION_COOKIE)?.value;
   // "Continue as a guest": read-only browsing. Pages and routes decide what a guest may see.
   const isGuest = req.cookies.get("sh_guest")?.value === "1";
 
   // Cheap first gate only. The real session check happens on the server for every page,
   // action and API route (see src/server/actor.ts).
-  if (!hasSession && !isGuest && !isPublic(pathname)) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-    }
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = pathname !== "/" ? `?next=${encodeURIComponent(pathname + search)}` : "";
-    return NextResponse.redirect(url);
+  if (!hasSession && !isGuest && pathname.startsWith("/api/") && !isPublicApi(pathname)) {
+    return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
   const nonce = btoa(crypto.randomUUID());

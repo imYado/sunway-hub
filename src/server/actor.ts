@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { readSessionToken } from "./auth/cookies";
 import { actorFromSession, loadSession, type LoadedSession } from "./auth/session";
 import type { Actor } from "./actor-types";
@@ -43,8 +43,19 @@ export const GUEST_ACTOR: Actor = Object.freeze({
   guest: true,
 }) as Actor;
 
-export async function isGuest(): Promise<boolean> {
+/** Chose "continue as a guest" on the welcome popup or the sign-in page. */
+export async function choseGuest(): Promise<boolean> {
   return (await cookies()).get(GUEST_COOKIE)?.value === "1";
+}
+
+/**
+ * A visitor browses as a guest when they chose to, or simply have no session yet
+ * (first visit, signed out, or an expired session). Someone part-way through
+ * signing in or setting up their account is not a guest.
+ */
+export async function isGuest(): Promise<boolean> {
+  if (await choseGuest()) return true;
+  return !(await getSession());
 }
 
 /** A signed-in member, or the guest stand-in, or null. For read-only routes. */
@@ -61,9 +72,15 @@ export async function getViewer(): Promise<Actor | null> {
 export async function requireMember(opts: { guestOk?: boolean } = {}): Promise<Actor> {
   const actor = await getActor();
   if (!actor && opts.guestOk && (await isGuest())) return GUEST_ACTOR;
-  if (!actor) redirect("/login");
+  if (!actor) redirect(await loginHref());
   if (!actor.onboarded || (await needsConsent(actor.id))) redirect("/onboarding");
   return actor;
+}
+
+/** /login, coming back to the current page afterwards. */
+async function loginHref(): Promise<string> {
+  const path = (await headers()).get("x-pathname");
+  return path && path !== "/" && path.startsWith("/") && !path.startsWith("//") ? `/login?next=${encodeURIComponent(path)}` : "/login";
 }
 
 /** For pages: admin only. Everyone else gets a 404 so the admin area stays hidden. */

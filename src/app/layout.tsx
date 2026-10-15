@@ -8,7 +8,8 @@ import { SiteFooter } from "@/components/layout/footer";
 import { AppNav, type NavUser } from "@/components/layout/app-nav";
 import { HydrationMarker } from "@/components/layout/hydration-marker";
 import { PageInteractions } from "@/components/layout/page-interactions";
-import { GUEST_COOKIE, getActor } from "@/server/actor";
+import { GUEST_COOKIE, getActor, getSession } from "@/server/actor";
+import { WelcomeDialog } from "@/components/layout/welcome-dialog";
 import { unreadCount } from "@/server/dal/notifications";
 import { hasApprovedAvatar } from "@/server/dal/users";
 import { incomingFriendRequestCount } from "@/server/dal/friends";
@@ -38,13 +39,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = savedTheme === "light" || savedTheme === "dark" ? savedTheme : undefined;
   const pathname = h.get("x-pathname") ?? "/";
   let actor = null;
+  let hasSession = false;
   let settings = null;
   let unread = 0;
   let unreadMessages = 0;
   let hasAvatar = false;
   let friendRequests = 0;
   try {
-    [actor, settings] = await Promise.all([getActor(), getSettings()]);
+    let session;
+    [actor, settings, session] = await Promise.all([getActor(), getSettings(), getSession()]);
+    hasSession = !!session;
     if (actor?.onboarded) {
       [unread, unreadMessages, hasAvatar, friendRequests] = await Promise.all([
         unreadCount(actor),
@@ -56,14 +60,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   } catch (err) {
     console.error("Layout data failed:", err instanceof Error ? err.name : "unknown");
   }
-  const guest = !actor && c.get(GUEST_COOKIE)?.value === "1";
+  const choseGuest = c.get(GUEST_COOKIE)?.value === "1";
+  const onPublicPage = ALWAYS_AVAILABLE.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  // No session means guest mode straight away; someone part-way through signing in is not a guest.
+  const guest = !actor && (choseGuest || !hasSession);
+  // First visit: a popup over the guest view asks them to sign in or keep looking around.
+  const welcome = guest && !choseGuest && !onPublicPage;
   const navUser: NavUser | null =
     actor?.onboarded && actor.username
       ? { id: actor.id, username: actor.username, displayName: actor.displayName, isAdmin: actor.isAdmin, hasAvatar }
       : null;
   const withNav = !!navUser || guest;
   const maintenance =
-    !!settings?.maintenanceMode && !actor?.isAdmin && !ALWAYS_AVAILABLE.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    !!settings?.maintenanceMode && !actor?.isAdmin && !onPublicPage;
 
   return (
     <html lang="en" data-theme={theme}>
@@ -73,7 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <AppNav user={navUser} guest={guest} unread={unread} unreadMessages={unreadMessages} friendRequests={friendRequests} />
         <div className={`flex flex-1 flex-col ${withNav ? "pb-16 md:pb-0 md:pl-20 lg:pl-60" : ""}`}>
-          {guest && (
+          {guest && !pathname.startsWith("/login") && (
             <div role="region" aria-label="Guest mode" className="border-b border-line bg-surface">
               <p className="mx-auto max-w-content px-4 py-2 text-sm sm:px-6">
                 You&apos;re browsing as a guest, so you can look around but not post, comment or message.{" "}
@@ -98,6 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </main>
           <SiteFooter />
         </div>
+        {welcome && !maintenance && <WelcomeDialog next={pathname} />}
         <HydrationMarker />
         <Suspense fallback={null}>
           <PageInteractions />

@@ -54,7 +54,7 @@ export function SortMenu({ current, options }: { current: string; options: SortO
       <div
         aria-hidden="true"
         onClick={() => setOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 motion-reduce:transition-none md:bg-transparent ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`fixed inset-0 z-40 bg-[rgb(0_0_0/0.4)] transition-opacity duration-200 motion-reduce:transition-none md:bg-transparent ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
       />
       <div
         id={id}
