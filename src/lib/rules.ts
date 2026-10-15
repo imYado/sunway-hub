@@ -161,8 +161,6 @@ export function cleanLinkUrl(raw: string): string | null {
   return url.toString();
 }
 
-export const OWN_WORK_STATEMENT =
-  "This is my own work, or I have permission to share it. It is not a lecturer's slides, a textbook, an exam paper, exam answers, or assessment material for a currently running assessment.";
 
 /** "Jan 2026" style semester labels. */
 export const SEMESTER_RE = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (20\d{2})$/;

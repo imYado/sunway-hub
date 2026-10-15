@@ -112,7 +112,6 @@ export const createPostSchema = z
       .max(MAX_LINKS_PER_POST, `You can add up to ${MAX_LINKS_PER_POST} links.`)
       .default([]),
     anonymous: z.boolean().default(false),
-    ownWork: z.literal(true, { errorMap: () => ({ message: "Please confirm that you have the right to share this." }) }),
     files: z
       .array(z.object({ pathname: z.string().min(1).max(500), name: z.string().min(1).max(200) }))
       .max(MAX_FILES_PER_POST, `You can attach up to ${MAX_FILES_PER_POST} files.`)
@@ -192,6 +191,7 @@ export async function createPost(actor: Actor, raw: CreatePostInput): Promise<{ 
         status: autoApproved ? "approved" : "pending",
         decidedAt: autoApproved ? new Date() : null,
         decidedBy: autoApproved ? actor.id : null,
+        // Posting means agreeing to the notice beside the Post button, so record when that happened.
         ownWorkConfirmedAt: new Date(),
       });
       if (subjectRows.length) {

@@ -83,7 +83,6 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await alice.getByLabel(/^Tags/).press("Enter");
   await alice.getByLabel("Semester").selectOption("Jan 2026");
   await alice.getByLabel("Attachments (optional)").setInputFiles(await pngFile());
-  await alice.getByLabel(/This is my own work/).check();
   await alice.getByRole("button", { name: "Submit for approval" }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
   postUrl = new URL(alice.url()).pathname;
@@ -139,7 +138,6 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await alice.getByRole("link", { name: "Edit" }).click();
   await ready(alice);
   await alice.getByLabel("Description").fill("My own summary with a diagram, now with an example.");
-  await alice.getByLabel(/This is my own work/).check();
   await alice.getByRole("button", { name: "Save changes" }).click();
   await alice.waitForURL((u) => u.pathname === postUrl);
   await expect(alice.getByText("now with an example")).toBeVisible();
@@ -277,7 +275,6 @@ test("delete by admin (with reason) and by poster", async ({ browser }) => {
   await alice.getByLabel("Title").fill("A post I will delete");
   await alice.getByLabel(/^Tags/).fill("MTH1114 Computer Mathematics");
   await alice.getByLabel(/^Tags/).press("Enter");
-  await alice.getByLabel(/This is my own work/).check();
   await alice.getByRole("button", { name: "Submit for approval" }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
   const own = new URL(alice.url()).pathname;

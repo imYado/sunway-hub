@@ -56,7 +56,6 @@ async function newStudyPost(actor: Actor, title = "Week 3 lecture summary", with
     description: "My own summary of week 3.",
     subjects: ["CSC1024 Programming Principles"],
     semester: "Jan 2026",
-    ownWork: true,
     files: withFile ? [await quarantine(actor, "notes.pdf", pdfBytes())] : [],
   });
 }
@@ -97,16 +96,10 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
   it("a quarantine path belonging to someone else is refused", async () => {
     const stolen = await quarantine(alice, "notes.pdf", pdfBytes());
     await expect(
-      createPost(bob, { type: "study", title: "Stolen upload", subjects: ["X"], ownWork: true, files: [stolen] }),
+      createPost(bob, { type: "study", title: "Stolen upload", subjects: ["X"], files: [stolen] }),
     ).rejects.toThrow(/Invalid upload/);
   });
 
-  it("the own-work statement must be ticked", async () => {
-    await expect(
-      // @ts-expect-error ownWork must be literally true
-      createPost(alice, { type: "study", title: "No statement", subjects: ["X"], ownWork: false }),
-    ).rejects.toThrow();
-  });
 
   it("members cannot reach admin functions", async () => {
     const { id } = await newStudyPost(alice, "Needs a decision");
@@ -196,12 +189,12 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     expect(all.length).toBe(SUNWAY_CLUBS.length);
     const club = all[0];
     await expect(
-      createPost(bob, { type: "club", title: "Club recruitment", clubId: club.id, ownWork: true }),
+      createPost(bob, { type: "club", title: "Club recruitment", clubId: club.id }),
     ).rejects.toThrow(/managers/);
     await expect(updateClubAsManager(bob, club.id, { description: "Hacked" })).rejects.toThrow(/managers/);
     await assignClubManager(admin, club.id, bob.id, true);
     const bobManager = { ...bob, managedClubIds: [club.id] };
-    const r = await createPost(bobManager, { type: "club", title: "Club recruitment", clubId: club.id, ownWork: true });
+    const r = await createPost(bobManager, { type: "club", title: "Club recruitment", clubId: club.id });
     expect(r.status).toBe("pending"); // still needs approval
     await updateClubAsManager(bobManager, club.id, { description: "We meet on Fridays.", socials: { instagram: "@ourclub" } });
     await expect(updateClubAsManager(bobManager, club.id, { description: "shit club" })).rejects.toThrow(/inappropriate/);
