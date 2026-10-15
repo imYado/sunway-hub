@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Download } from "lucide-react";
 import { ReportForm } from "@/components/report-form";
 import { VoteControl } from "@/components/posts/vote-control";
+import { Avatar } from "@/components/ui/avatar";
 import { formatDateTime } from "@/lib/dates";
 import { formatBytes } from "@/lib/files";
 import { COMMENT_MAX_DEPTH } from "@/lib/rules";
@@ -56,6 +57,14 @@ function CommentItem({ node, depth, ctx, canComment, isAdmin }: { node: Node; de
         <VoteControl kind="comment" id={c.id} postId={ctx.postId} score={c.score} vote={c.viewer.vote} canVote={c.viewer.canVote} />
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+            <Avatar
+              userId={c.author.id}
+              name={c.author.displayName ?? c.author.username}
+              hasImage={c.author.hasAvatar}
+              anonymous={c.author.anonymous && !c.author.id}
+              decorative
+              size={24}
+            />
             <CommentAuthor c={c} />
             <a href={`#comment-${c.id}`} className="text-muted">
               {formatDateTime(c.createdAt)}

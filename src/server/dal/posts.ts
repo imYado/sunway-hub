@@ -18,6 +18,7 @@ import {
   type PostLink,
   storedFiles,
   subjects,
+  userAvatars,
   users,
 } from "@/db/schema";
 import { parseKlInput } from "@/lib/dates";
@@ -252,7 +253,7 @@ export interface PostCard {
   deletedAt: Date | null;
   decisionReason: string | null;
   /** For anonymous posts, only the poster and the admin see who wrote it. */
-  author: { id: string; username: string | null; displayName: string | null; deleted: boolean; verifiedTeacher: boolean; anonymous: boolean; notSunway: boolean };
+  author: { id: string; username: string | null; displayName: string | null; deleted: boolean; verifiedTeacher: boolean; anonymous: boolean; notSunway: boolean; hasAvatar: boolean };
   club: { slug: string; name: string } | null;
   subjects: { name: string; slug: string }[];
   event: { startsAt: Date; endsAt: Date | null; location: string } | null;
@@ -284,6 +285,7 @@ const cardSelect = {
   authorStatus: users.status,
   authorTeacher: users.teacherVerified,
   authorSunway: users.sunwayVerified,
+  authorAvatar: userAvatars.approvedFileId,
   clubSlug: clubs.slug,
   clubName: clubs.name,
   eventStartsAt: events.startsAt,
@@ -335,7 +337,7 @@ async function hydrateCards(actor: Actor, rows: CardRow[]): Promise<PostCard[]> 
       deletedAt: r.deletedAt as Date | null,
       decisionReason: r.decisionReason as string | null,
       author: masked
-        ? { id: "", username: null, displayName: null, deleted: false, verifiedTeacher: false, anonymous: true, notSunway: false }
+        ? { id: "", username: null, displayName: null, deleted: false, verifiedTeacher: false, anonymous: true, notSunway: false, hasAvatar: false }
         : {
             id: r.authorId as string,
             username: deleted ? null : (r.authorUsername as string | null),
@@ -344,6 +346,7 @@ async function hydrateCards(actor: Actor, rows: CardRow[]): Promise<PostCard[]> 
             verifiedTeacher: !deleted && (r.authorTeacher as boolean),
             anonymous,
             notSunway: !deleted && !(r.authorSunway as boolean),
+            hasAvatar: !deleted && !!r.authorAvatar,
           },
       club: r.clubSlug ? { slug: r.clubSlug as string, name: r.clubName as string } : null,
       subjects: subjectRows.filter((s) => s.postId === r.id).map((s) => ({ name: s.name, slug: s.slug })),
@@ -361,6 +364,7 @@ function baseCardQuery() {
     .select(cardSelect)
     .from(posts)
     .innerJoin(users, eq(users.id, posts.authorId))
+    .leftJoin(userAvatars, eq(userAvatars.userId, posts.authorId))
     .leftJoin(clubs, eq(clubs.id, posts.clubId))
     .leftJoin(events, eq(events.postId, posts.id));
 }
