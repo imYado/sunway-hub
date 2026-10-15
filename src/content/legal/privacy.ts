@@ -20,7 +20,7 @@ For any privacy question or request, email **hubsunway@gmail.com**.
 
 When you use SJ Study we collect:
 
-- Your Sunway email address (used to sign in). If our codes can't reach your Sunway email, you may sign in with another email instead; we then keep both addresses, and only the admin sees the Sunway one.
+- Your Sunway email address (used to sign in).
 - Your name, username, bio, pronouns and role (student, teacher or other).
 - Your profile picture, if you upload one.
 - Content you upload: posts, descriptions, files, images and videos.

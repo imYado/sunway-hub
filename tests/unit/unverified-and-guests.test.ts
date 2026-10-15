@@ -3,9 +3,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { rateLimits, users } from "@/db/schema";
 import type { Actor } from "@/server/actor-types";
-import { issueOtp } from "@/server/auth/otp";
-import { startOtherEmailLogin, verifyOtherEmailCode } from "@/server/auth/login";
-import { loadSession, actorFromSession } from "@/server/auth/session";
 import { decidePost, searchUsers, setSunwayVerified } from "@/server/dal/admin";
 import { startConversation } from "@/server/dal/messages";
 import { createPost, getPostDetail, listFeed } from "@/server/dal/posts";
@@ -25,10 +22,8 @@ const GUEST = {
   guest: true,
 } as Actor;
 
-let ip = 0;
-const nextIp = () => `10.9.0.${++ip}`;
 
-describe.skipIf(!hasDb)("signing in with another email, and guests", () => {
+describe.skipIf(!hasDb)("unverified accounts and guests", () => {
   let admin: Actor;
   let member: Actor;
   beforeAll(async () => {
@@ -40,26 +35,11 @@ describe.skipIf(!hasDb)("signing in with another email, and guests", () => {
     await db.delete(rateLimits);
   });
 
-  it("needs a real Sunway address to link to, and a non-Sunway address to sign in with", async () => {
-    await expect(startOtherEmailLogin("someone@gmail.com", "me@gmail.com", nextIp())).rejects.toThrow(/Only Sunway/);
-    await expect(startOtherEmailLogin("a@imail.sunway.edu.my", "b@imail.sunway.edu.my", nextIp())).rejects.toThrow(/Sunway address/);
-    await expect(startOtherEmailLogin("a@imail.sunway.edu.my", "not-an-email", nextIp())).rejects.toThrow(/valid email/);
-    // The admin account never gets a code this way.
-    expect(await startOtherEmailLogin("a@imail.sunway.edu.my", process.env.ADMIN_EMAIL!, nextIp())).toEqual({ email: process.env.ADMIN_EMAIL });
-    const code = await issueOtp(process.env.ADMIN_EMAIL!, "login_other", { send: false });
-    await expect(verifyOtherEmailCode("a@imail.sunway.edu.my", process.env.ADMIN_EMAIL!, code, nextIp())).rejects.toThrow(/incorrect/);
-  });
-
-  it("creates an unverified account that can post but not use the Market or start messages, until the admin verifies it", async () => {
-    const code = await issueOtp("outsider@gmail.com", "login_other", { send: false });
-    const s = await verifyOtherEmailCode("21000001@imail.sunway.edu.my", "Outsider@Gmail.com", code, nextIp());
-    const loaded = await loadSession(s.token);
-    expect(loaded?.user).toMatchObject({ email: "outsider@gmail.com", sunwayVerified: false, claimedSunwayEmail: "21000001@imail.sunway.edu.my" });
-    await db.update(users).set({ username: "outsider", onboardedAt: new Date() }).where(eq(users.id, loaded!.user.id));
-    const me = await actorFromSession((await loadSession(s.token))!);
+  it("an unverified account (from the old other-email sign-in) shows a badge and can't use the Market or start messages until verified", async () => {
+    const me = await makeUser({ email: "outsider@gmail.com", username: "outsider" });
+    await db.update(users).set({ sunwayVerified: false, claimedSunwayEmail: "21000001@imail.sunway.edu.my" }).where(eq(users.id, me.id));
 
     const { id } = await createPost(me, { type: "discussion", title: "Hello from a personal email" });
-    await decidePost(admin, id, { decision: "approve" });
     expect((await getPostDetail(member, id)).author.notSunway).toBe(true);
     expect((await getProfile(member, "outsider")).notSunway).toBe(true);
     await expect(createPost(me, { type: "market", marketKind: "sell", title: "Selling a lamp" })).rejects.toThrow(/isn't verified/);

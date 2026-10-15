@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { PasswordMeter } from "@/components/auth/password-meter";
 import { isAcceptablePassword } from "@/lib/password-strength";
+import { safeNext } from "@/lib/safe-next";
 import type { OtpPurpose } from "@/server/auth/otp";
 import {
   continueAsGuestAction,
@@ -12,18 +13,13 @@ import {
   forgotPasswordAction,
   passwordAction,
   startLoginAction,
-  startOtherEmailAction,
   totpAction,
   verifyCodeAction,
-  verifyOtherCodeAction,
   type LoginResult,
 } from "./actions";
 
-type Step = "email" | "code" | "other_email" | "other_code" | "password" | "create_password" | "totp";
+type Step = "email" | "code" | "password" | "create_password" | "totp";
 
-function safeNext(next: string | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
 
 export function LoginFlow({
   initialStep,
@@ -39,9 +35,6 @@ export function LoginFlow({
   const router = useRouter();
   const [step, setStep] = useState<Step>(initialStep);
   const [email, setEmail] = useState("");
-  // The Sunway address, kept while the person signs in with another email.
-  const [sunwayEmail, setSunwayEmail] = useState("");
-  const [otherEmail, setOtherEmail] = useState("");
   const [purpose, setPurpose] = useState<OtpPurpose>("login");
   const [error, setError] = useState<string | null>(initialError);
   const [info, setInfo] = useState<string | null>(null);
@@ -54,7 +47,7 @@ export function LoginFlow({
       return;
     }
     setError(null);
-    if (result.email && result.step !== "other_code") setEmail(result.email);
+    if (result.email) setEmail(result.email);
     if (result.purpose) setPurpose(result.purpose);
     if (result.step === "done") {
       router.replace(safeNext(next));
@@ -169,23 +162,7 @@ export function LoginFlow({
                 <a href={`mailto:hubsunway@gmail.com?subject=${encodeURIComponent("Please verify my SJ Study account")}`} className="underline">
                   hubsunway@gmail.com
                 </a>{" "}
-                from <span className="break-all">{email}</span> and we&apos;ll verify you.
-              </li>
-              <li>
-                <button
-                  type="button"
-                  className="underline"
-                  disabled={pending}
-                  onClick={() => {
-                    setSunwayEmail(email);
-                    setError(null);
-                    setStep("other_email");
-                  }}
-                >
-                  Sign in with another email
-                </button>{" "}
-                for now. You can post right away, but your account shows as not verified and can&apos;t use the Market or start messages until
-                we verify it.
+                from <span className="break-all">{email}</span> and we&apos;ll help you sign in.
               </li>
               <li>
                 <button type="button" className="underline" disabled={pending} onClick={() => run(() => continueAsGuestAction())}>
@@ -195,94 +172,6 @@ export function LoginFlow({
               </li>
             </ol>
           </section>
-        )}
-
-        {step === "other_email" && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              run(() => startOtherEmailAction(sunwayEmail, otherEmail));
-            }}
-          >
-            <h1 className="text-lg font-semibold">Sign in with another email</h1>
-            <p className="mb-4 mt-1 text-sm text-muted">
-              We&apos;ll send a code there. Your account is linked to <span className="break-all text-ink">{sunwayEmail}</span> and shows as not
-              verified until we confirm it&apos;s yours.
-            </p>
-            <label htmlFor="other-email" className="label">
-              Other email
-            </label>
-            <input
-              id="other-email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              required
-              className="input"
-              value={otherEmail}
-              onChange={(e) => setOtherEmail(e.target.value)}
-              placeholder="you@gmail.com"
-              aria-describedby={error ? "login-error" : undefined}
-            />
-            <button type="submit" className="btn btn-primary mt-4 w-full" disabled={pending}>
-              {pending ? "Please wait..." : "Send code"}
-            </button>
-            <button
-              type="button"
-              className="btn mt-2 w-full"
-              disabled={pending}
-              onClick={() => {
-                setError(null);
-                setStep("code");
-              }}
-            >
-              Back
-            </button>
-          </form>
-        )}
-
-        {step === "other_code" && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const code = (new FormData(e.currentTarget).get("other-code") as string) ?? "";
-              run(() => verifyOtherCodeAction(sunwayEmail, otherEmail, code));
-            }}
-          >
-            <h1 className="text-lg font-semibold">Check your email</h1>
-            <p className="mb-4 mt-1 text-sm text-muted">
-              A 6-digit code is on its way to <span className="break-all text-ink">{otherEmail}</span>. It expires in 10 minutes. Check junk or spam
-              too.
-            </p>
-            <label htmlFor="other-code" className="label">
-              6-digit code
-            </label>
-            <input
-              id="other-code"
-              name="other-code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9 ]{6,7}"
-              maxLength={7}
-              required
-              className="input tracking-widest"
-              aria-describedby={error ? "login-error" : undefined}
-            />
-            <button type="submit" className="btn btn-primary mt-4 w-full" disabled={pending}>
-              {pending ? "Checking..." : "Sign in"}
-            </button>
-            <button
-              type="button"
-              className="btn mt-2 w-full"
-              disabled={pending}
-              onClick={() => {
-                setError(null);
-                setStep("other_email");
-              }}
-            >
-              Use a different email
-            </button>
-          </form>
         )}
 
         {step === "password" && (

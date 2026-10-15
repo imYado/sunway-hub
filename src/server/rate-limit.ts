@@ -34,8 +34,14 @@ export const LIMITS = {
   codeRequestPerEmail: { limit: 5, window: 3600 },
   codeRequestPerIp: { limit: 20, window: 3600 },
   codeVerifyPerIp: { limit: 30, window: 900 },
+  // Caps guesses at any one address however many IPs an attacker has.
+  codeVerifyPerEmail: { limit: 10, window: 3600 },
+  // "Sign in with another email" can target any address, so it gets its own, tighter caps.
+  otherEmailPerIp: { limit: 5, window: 86400 },
+  otherEmailPerEmail: { limit: 3, window: 3600 },
   passwordPerIp: { limit: 10, window: 900 },
   passwordPerAccount: { limit: 20, window: 3600 },
+  passwordPerAccountTotal: { limit: 200, window: 3600 },
   uploadAuthPerUser: { limit: 60, window: 3600 },
   reportPerUser: { limit: 20, window: 3600 },
   searchPerUser: { limit: 120, window: 60 },

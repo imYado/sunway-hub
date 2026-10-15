@@ -157,9 +157,11 @@ export async function eventsForSchedule(actor: Actor, from: Date, to: Date): Pro
   if (p.clubs === "following") sources.push(sql`${posts.clubId} in (select ${clubFollows.clubId} from ${clubFollows} where ${clubFollows.userId} = ${actor.id})`);
   if (p.clubs === "all") sources.push(isNotNull(posts.clubId));
   if (p.clubs === "chosen" && p.clubIds.length) sources.push(inArray(posts.clubId, p.clubIds));
-  if (p.authorIds.length) sources.push(inArray(posts.authorId, p.authorIds));
+  // Choosing events by person or role must never surface that person's anonymous events.
+  if (p.authorIds.length) sources.push(and(inArray(posts.authorId, p.authorIds), eq(posts.anonymous, false))!);
   for (const role of p.roles) {
-    sources.push(role === "teacher" ? and(eq(users.roleLabel, "teacher"), eq(users.teacherVerified, true))! : eq(users.roleLabel, role));
+    const byRole = role === "teacher" ? and(eq(users.roleLabel, "teacher"), eq(users.teacherVerified, true))! : eq(users.roleLabel, role);
+    sources.push(and(byRole, eq(posts.anonymous, false))!);
   }
   const rows = await db
     .select({

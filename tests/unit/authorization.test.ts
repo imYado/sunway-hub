@@ -33,7 +33,6 @@ import {
 } from "@/server/dal/posts";
 import { createReport } from "@/server/dal/reports";
 import { getAvatarFileForViewer, getProfile, updateProfile, uploadAvatar } from "@/server/dal/users";
-import { saveSettings, clearSettingsCache } from "@/server/settings";
 import { storage } from "@/server/storage";
 import { SUNWAY_CLUBS } from "@/content/clubs-seed";
 import { hasDb, makeUser, resetDb } from "./db-helpers";
@@ -71,9 +70,18 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     await db.delete(rateLimits);
   });
 
-  it("uploads are pending; members cannot see other people's pending posts", async () => {
-    const { id, status } = await newStudyPost(alice);
-    expect(status).toBe("pending");
+  it("new posts are live straight away and wait in the admin's review queue", async () => {
+    const live = await newStudyPost(alice, "Live straight away");
+    expect(live.status).toBe("approved");
+    expect((await getPostDetail(bob, live.id)).title).toBe("Live straight away");
+    expect((await pendingPosts(admin)).map((p) => p.id)).toContain(live.id);
+    await decidePost(admin, live.id, { decision: "approve" });
+    expect((await pendingPosts(admin)).map((p) => p.id)).not.toContain(live.id);
+  });
+
+  it("members cannot see other people's posts that are waiting for approval", async () => {
+    const { id } = await newStudyPost(alice);
+    await db.update(posts).set({ status: "pending", decidedAt: null }).where(eq(posts.id, id));
     await expect(getPostDetail(bob, id)).rejects.toThrow(/could not find/);
     expect((await getPostDetail(alice, id)).status).toBe("pending");
     expect((await getPostDetail(admin, id)).status).toBe("pending");
@@ -84,6 +92,7 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
 
   it("files of pending posts are only served to the owner and admin", async () => {
     const { id } = await newStudyPost(alice, "Pending post with a file", true);
+    await db.update(posts).set({ status: "pending", decidedAt: null }).where(eq(posts.id, id));
     const [file] = await db.select().from(storedFiles).where(eq(storedFiles.postId, id));
     expect(file.storagePath.startsWith(`files/${id}/`)).toBe(true);
     expect(await getFileForViewer(bob, file.id)).toBeNull();
@@ -151,15 +160,13 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     expect(reverted.title).toBe("Original title here");
   });
 
-  it("re-approval after title edit is enforced when the admin turns it on", async () => {
-    const { id } = await newStudyPost(alice, "Will be re-approved");
+  it("an edited post stays live but goes back in the admin's review queue", async () => {
+    const { id } = await newStudyPost(alice, "Will be reviewed again");
     await decidePost(admin, id, { decision: "approve" });
-    await saveSettings({ requireReapprovalAfterTitleEdit: true });
-    clearSettingsCache();
-    await editPostTitle(alice, id, "Changed after approval");
+    await editPostTitle(alice, id, "Changed after review");
     const [p] = await db.select().from(posts).where(eq(posts.id, id));
-    expect(p.status).toBe("pending");
-    await saveSettings({ requireReapprovalAfterTitleEdit: false });
+    expect(p.status).toBe("approved");
+    expect((await pendingPosts(admin)).map((x) => x.id)).toContain(id);
   });
 
   it("delete: poster can delete own; others cannot; admin must give a reason", async () => {
@@ -195,13 +202,14 @@ describe.skipIf(!hasDb)("server-side authorisation", () => {
     await assignClubManager(admin, club.id, bob.id, true);
     const bobManager = { ...bob, managedClubIds: [club.id] };
     const r = await createPost(bobManager, { type: "club", title: "Club recruitment", clubId: club.id });
-    expect(r.status).toBe("pending"); // still needs approval
+    expect(r.status).toBe("approved"); // live straight away, reviewed by the admin after
     await updateClubAsManager(bobManager, club.id, { description: "We meet on Fridays.", socials: { instagram: "@ourclub" } });
     await expect(updateClubAsManager(bobManager, club.id, { description: "shit club" })).rejects.toThrow(/inappropriate/);
   });
 
   it("votes: one per member, up or down, not on own posts, only on approved posts", async () => {
     const { id } = await newStudyPost(alice, "Vote candidate post");
+    await decidePost(admin, id, { decision: "reject", reason: "Not yet" });
     await expect(votePost(bob, id, 1)).rejects.toThrow(/could not find/);
     await decidePost(admin, id, { decision: "approve" });
     await expect(votePost(alice, id, 1)).rejects.toThrow(/own post/);

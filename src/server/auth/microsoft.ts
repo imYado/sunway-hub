@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { randomToken } from "@/lib/crypto";
 import { env } from "@/lib/env";
+import { safeNext } from "@/lib/safe-next";
 import { emailFromMicrosoftClaims, decodeJwtPayload, MicrosoftClaimError } from "@/lib/microsoft";
 import { AppError } from "../errors";
 import { enforce, LIMITS } from "../rate-limit";
@@ -26,9 +27,6 @@ export interface PendingMicrosoftLogin {
   next: string;
 }
 
-export function safeNext(next: string | null | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
-}
 
 /** Builds the Microsoft sign-in URL plus the values to keep in a short-lived cookie until the callback. */
 export function beginMicrosoftLogin(next: string | null): { url: string; pending: PendingMicrosoftLogin } {

@@ -520,11 +520,11 @@ export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, sto
       <p className="mb-4 text-sm text-muted">
         {editing
           ? "Your changes show as edited. If the admin asked for changes, saving sends the post back for approval."
-          : "The admin reviews every post before others can see it. You can edit it later."}
+          : "Your post appears straight away. The admin reviews posts and removes any that break the guidelines. You can edit it later."}
       </p>
 
       <button type="submit" className="btn btn-primary" disabled={busy}>
-        {busy ? (editing ? "Saving..." : "Submitting...") : editing ? "Save changes" : "Submit for approval"}
+        {busy ? (editing ? "Saving..." : "Submitting...") : editing ? "Save changes" : "Post"}
       </button>
       <p className="mt-2 text-xs text-muted">
         By posting, you confirm you have the right to share this and agree to the{" "}

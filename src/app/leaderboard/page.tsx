@@ -9,13 +9,17 @@ export const metadata: Metadata = { title: "Leaderboard" };
 
 export default async function LeaderboardPage() {
   const actor = await requireMember({ guestOk: true });
-  const [rows, me] = await Promise.all([leaderboard(), getMe(actor)]);
+  const [rows, me] = await Promise.all([leaderboard(), actor.guest ? null : getMe(actor)]);
   return (
     <div className="mx-auto max-w-3xl">
       <PageTitle>Top contributors</PageTitle>
       <p className="mb-6 text-muted">
         Ranked by the upvotes minus downvotes on their posts. Anonymous posts are not counted. Only members who choose to appear are listed.{" "}
-        {me.showOnLeaderboard ? "You're opted in." : "You're not listed."} <Link href="/settings">Change this in Settings</Link>.
+        {me && (
+          <>
+            {me.showOnLeaderboard ? "You're opted in." : "You're not listed."} <Link href="/settings">Change this in Settings</Link>.
+          </>
+        )}
       </p>
       {rows.length === 0 ? (
         <EmptyState title="Nobody on the leaderboard yet" />

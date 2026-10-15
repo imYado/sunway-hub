@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { AutoRefresh } from "@/components/messages/auto-refresh";
 import { MessageComposer } from "@/components/messages/composer";
+import { DmPrivacyNote } from "@/components/messages/privacy-note";
 import { ReportForm } from "@/components/report-form";
 import { formatDateTime } from "@/lib/dates";
 import { env } from "@/lib/env";
@@ -138,7 +139,10 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
       <div className="mt-6">
         {c.canSend ? (
-          <MessageComposer conversationId={c.id} userId={actor.id} storageDriver={env.storageDriver} />
+          <>
+            <DmPrivacyNote />
+            <MessageComposer conversationId={c.id} userId={actor.id} storageDriver={env.storageDriver} />
+          </>
         ) : c.status === "pending" && c.role === "starter" ? (
           <p className="surface p-3 text-sm text-muted">Your request was sent. You can send more once they accept.</p>
         ) : c.status === "declined" ? (

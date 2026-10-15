@@ -123,7 +123,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
           <Calendar year={year} month={month} events={events} />
         </>
       ) : events.length === 0 ? (
-        <EmptyState title="No upcoming events">Club managers and members can add events. They appear here after approval.</EmptyState>
+        <EmptyState title="No upcoming events">Club managers and members can add events.</EmptyState>
       ) : (
         <ul className="space-y-2">
           {events.map((e) => (

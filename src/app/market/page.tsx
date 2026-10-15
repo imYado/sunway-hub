@@ -61,7 +61,7 @@ async function Market({ searchParams }: { searchParams: Promise<SP> }) {
         path="/market"
         empty={
           <EmptyState title="No listings yet">
-            <Link href="/posts/new?type=market">Post the first one</Link>. Listings are checked by the admin before they appear.
+            <Link href="/posts/new?type=market">Post the first one</Link>.
           </EmptyState>
         }
       />

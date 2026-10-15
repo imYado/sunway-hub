@@ -9,7 +9,7 @@ export default async function AdminDashboard() {
   const d = await dashboard(actor);
   const pct = Math.min(100, Math.round(d.storage.ratio * 100));
   const tiles = [
-    { label: "Pending posts", value: d.pendingPosts, href: "/admin/queue" },
+    { label: "Posts to review", value: d.pendingPosts, href: "/admin/queue" },
     { label: "Pending profile pictures", value: d.pendingAvatars, href: "/admin/queue#images" },
     { label: "Pending club logos", value: d.pendingLogos, href: "/admin/queue#images" },
     { label: "Open reports", value: d.openReports, href: "/admin/reports" },

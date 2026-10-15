@@ -19,9 +19,14 @@ export interface EmailMessage {
   text: string;
 }
 
-let transporter: nodemailer.Transporter | null = null;
+// nodemailer 10 ships without type declarations; this is the one call we use.
+interface SmtpTransport {
+  sendMail(msg: { from?: string; to: string; subject: string; text: string }): Promise<unknown>;
+}
 
-function smtp(): nodemailer.Transporter {
+let transporter: SmtpTransport | null = null;
+
+function smtp(): SmtpTransport {
   if (!transporter) {
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_APP_PASSWORD;

@@ -18,7 +18,7 @@ SJ Study is free and non-commercial. There are no ads, payments, donations, spon
 
 ## 2. Who can use SJ Study
 
-- You must be a current Sunway student, teacher or staff member with a valid Sunway email address. If you sign in with another email because our codes can't reach your Sunway email, your account shows as "not verified" and cannot use the Market or start private messages until the admin confirms your Sunway address.
+- You must be a current Sunway student, teacher or staff member with a valid Sunway email address.
 - Guests may browse without an account but cannot post, comment, vote or message.
 - One account per person. Do not share your account or sign-in codes.
 - You are responsible for activity on your account. Sign out on shared devices and tell us at hubsunway@gmail.com if you think your account has been misused.
@@ -47,7 +47,7 @@ Do not upload or post:
 
 ## 5. Moderation
 
-- Every post is reviewed by the admin before other members can see it. Comments and private messages are not reviewed in advance, but can be reported.
+- Posts appear as soon as you publish them. The admin reviews posts afterwards and removes any that break these Terms or the Guidelines. Comments and private messages are not reviewed in advance, but can be reported.
 - The admin may reject, remove or hide content, and suspend or ban accounts, without notice, to keep the community safe.
 - Content reported by several members may be hidden automatically while it is reviewed.
 - If you disagree with a decision, email hubsunway@gmail.com with the details and we will look at it again.

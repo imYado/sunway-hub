@@ -74,6 +74,18 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
           <dt className="text-muted">Sunway email</dt>
           <dd className="break-all">
             {u.sunwayVerified ? "Verified" : `Not verified. Says it is ${u.claimedSunwayEmail ?? "(not given)"}`}
+            {!u.sunwayVerified && data.claimConflicts.length > 0 && (
+              <span className="mt-1 block text-danger">
+                Careful: this address is also used or claimed by{" "}
+                {data.claimConflicts.map((c, i) => (
+                  <span key={c.id}>
+                    {i > 0 && ", "}
+                    <Link href={`/admin/users/${c.id}`}>{c.username ? `@${c.username}` : c.email}</Link>
+                  </span>
+                ))}
+                . Only verify the one who emailed you from it.
+              </span>
+            )}
           </dd>
         </div>
         <div>

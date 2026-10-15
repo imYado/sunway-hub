@@ -72,7 +72,7 @@ test("member sign-in with onboarding; admin area is hidden (404)", async ({ page
   expect(queue?.status()).toBe(404);
 });
 
-test("post upload -> approval -> visible to other members", async ({ browser }) => {
+test("post upload -> visible straight away -> admin review", async ({ browser }) => {
   const alice = await browser.newPage();
   await signInMember(alice, ALICE);
   await alice.goto("/posts/new");
@@ -84,29 +84,23 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await alice.getByLabel(/^Tags/).press("Enter");
   await alice.getByLabel("Semester").selectOption("Jan 2026");
   await alice.getByLabel("Attachments (optional)").setInputFiles(await pngFile());
-  await alice.getByRole("button", { name: "Submit for approval" }).click();
+  await alice.getByRole("button", { name: "Post", exact: true }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
   postUrl = new URL(alice.url()).pathname;
-  await expect(alice.getByText("Pending approval")).toBeVisible();
   await expect(alice.getByRole("img", { name: /Image attached/ })).toBeVisible();
+  const fileSrc = await alice.getByRole("img", { name: /Image attached/ }).getAttribute("src");
 
-  // Bob cannot see the pending post or its file.
+  // It's live straight away, and waits in the admin's review queue.
   const bob = await browser.newPage();
   await signInMember(bob, BOB, "bob_t");
-  const hidden = await bob.goto(postUrl);
-  expect(hidden?.status()).toBe(404);
-  const fileSrc = await alice.getByRole("img", { name: /Image attached/ }).getAttribute("src");
-  const fileRes = await bob.request.get(fileSrc!);
-  expect(fileRes.status()).toBe(404);
-
-  // Admin approves from the queue.
   const admin = await browser.newPage();
   await signInAdmin(admin);
   await admin.goto("/admin/queue");
   await ready(admin);
   const item = admin.locator("[data-queue-item]", { hasText: "Week 3 notes on recursion" });
+  await expect(item.getByText("Live, not reviewed")).toBeVisible();
   await item.getByRole("button", { name: "Approve" }).click();
-  // Approved items leave the queue.
+  // Reviewed items leave the queue.
   await expect(item).toHaveCount(0);
 
   // Now Bob can see it and download the file (served with nosniff).
@@ -148,7 +142,7 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await Promise.all([alice.close(), bob.close(), admin.close()]);
 });
 
-test("when the code doesn't arrive: guest browsing and signing in with another email", async ({ browser }) => {
+test("when the code doesn't arrive: guest browsing, and no sign-in with other emails", async ({ browser }) => {
   // Guest: can read the approved post, but not post, message or open private pages.
   const guestCtx = await browser.newContext();
   const guest = await guestCtx.newPage();
@@ -166,27 +160,15 @@ test("when the code doesn't arrive: guest browsing and signing in with another e
   await expect(guest).toHaveURL(/\/login/);
   await guestCtx.close();
 
-  // Another email: signs in, shows as not verified, can't post in the Market.
+  // Only Sunway emails can sign in; there is no "another email" option.
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto("/login");
   await ready(page);
   await page.getByLabel("Email").fill("21000002@imail.sunway.edu.my");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Sign in with another email" }).click();
-  const since = Date.now() - 1000;
-  await page.getByLabel("Other email").fill("frank.personal@gmail.com");
-  await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("6-digit code").fill(await latestCode("frank.personal@gmail.com", since));
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Welcome to SJ Study" })).toBeVisible();
-  await page.getByLabel("Full name").fill("Frank Personal");
-  await page.getByLabel("Username").fill("frank_p");
-  await page.getByLabel(/I have read and accept/).check();
-  await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
-  await page.goto("/u/frank_p");
-  await expect(page.getByText("Not verified as Sunway")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue as a guest" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in with another email" })).toHaveCount(0);
   await ctx.close();
 });
 
@@ -198,7 +180,7 @@ test("anonymous market listing, message request and image reply", async ({ brows
   await alice.getByRole("radio", { name: "Borrow or lend" }).check();
   await alice.getByLabel("Title").fill("Lending a graphing calculator");
   await alice.getByLabel("Post anonymously").check();
-  await alice.getByRole("button", { name: "Submit for approval" }).click();
+  await alice.getByRole("button", { name: "Post", exact: true }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
   const listingUrl = new URL(alice.url()).pathname;
 
@@ -383,7 +365,7 @@ test("delete by admin (with reason) and by poster", async ({ browser }) => {
   await alice.getByLabel("Title").fill("A post I will delete");
   await alice.getByLabel(/^Tags/).fill("MTH1114 Computer Mathematics");
   await alice.getByLabel(/^Tags/).press("Enter");
-  await alice.getByRole("button", { name: "Submit for approval" }).click();
+  await alice.getByRole("button", { name: "Post", exact: true }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
   const own = new URL(alice.url()).pathname;
   alice.on("dialog", (d) => d.accept());

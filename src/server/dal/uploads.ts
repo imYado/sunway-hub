@@ -119,7 +119,9 @@ export async function authorizeUpload(
       : purpose === "comment"
         ? Math.min(FILE_RULES[kind].maxBytes, COMMENT_FILE_MAX_BYTES)
         : FILE_RULES[kind].maxBytes;
-  return { maxBytes, allowedContentTypes: FILE_RULES[kind].mime };
+  // The quota checks above used the size the browser declared, so the upload token
+  // must not allow anything bigger than that.
+  return { maxBytes: Math.min(maxBytes, Math.max(1, Math.ceil(req.size))), allowedContentTypes: FILE_RULES[kind].mime };
 }
 
 export interface ProcessedFile {
@@ -253,6 +255,17 @@ export async function finaliseUploads(
         width: p.width,
         height: p.height,
       });
+    }
+    // Re-check the storage limits against the real sizes, not the declared ones.
+    if (out.length > 0) {
+      const added = out.reduce((n, f) => n + f.size, 0);
+      const status = await storageStatus();
+      if (status.used + added > status.cap * STORAGE_REFUSE_RATIO) {
+        throw new AppError("Uploads are paused because the site's shared storage is nearly full. Please try again later.", 503);
+      }
+      if ((await userStoredBytes(actor.id)) + added > settings.userStorageMb * MB) {
+        throw new AppError(`You have reached your ${settings.userStorageMb} MB storage limit. Delete old posts to free space.`);
+      }
     }
   } catch (err) {
     await store.delete(written).catch(() => {});
