@@ -72,6 +72,9 @@ export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 2000;
 export const REPORT_NOTE_MAX = 500;
 export const MAX_SUBJECT_TAGS = 3;
+export const MAX_LINKS_PER_POST = 15;
+export const LINK_URL_MAX = 500;
+export const LINK_LABEL_MAX = 100;
 // Timetables, study groups and group plans.
 export const TIMETABLE_MAX_ENTRIES = 80;
 export const TIMETABLE_LABEL_MAX = 80;
@@ -136,6 +139,21 @@ export const CLUB_CATEGORIES = [
 export type ClubCategory = (typeof CLUB_CATEGORIES)[number];
 
 export const SOCIAL_KEYS = ["instagram", "facebook", "tiktok", "linkedin", "website"] as const;
+
+/** Normalises a member-supplied link. Returns null unless it is a plain http(s) URL. */
+export function cleanLinkUrl(raw: string): string | null {
+  const value = raw.trim();
+  if (!value || value.length > LINK_URL_MAX) return null;
+  let url: URL;
+  try {
+    url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  if (url.username || url.password || !url.hostname.includes(".")) return null;
+  return url.toString();
+}
 
 export const OWN_WORK_STATEMENT =
   "This is my own work, or I have permission to share it. It is not a lecturer's slides, a textbook, an exam paper, exam answers, or assessment material for a currently running assessment.";

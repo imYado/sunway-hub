@@ -7,7 +7,17 @@ import { X } from "lucide-react";
 import { CleanInput, CleanTextarea } from "@/components/ui/clean-input";
 import { FILE_RULES, MAX_FILES_PER_POST, formatBytes, precheckFile, safeFileName, type FileKind } from "@/lib/files";
 import { PROFANITY_MESSAGE, containsProfanity } from "@/lib/profanity/filter";
-import { DESCRIPTION_MAX, MAX_SUBJECT_TAGS, OWN_WORK_STATEMENT, POST_TYPES, TITLE_MAX } from "@/lib/rules";
+import {
+  DESCRIPTION_MAX,
+  LINK_LABEL_MAX,
+  LINK_URL_MAX,
+  MAX_LINKS_PER_POST,
+  MAX_SUBJECT_TAGS,
+  OWN_WORK_STATEMENT,
+  POST_TYPES,
+  TITLE_MAX,
+  cleanLinkUrl,
+} from "@/lib/rules";
 import { createPostAction } from "@/app/actions/posts";
 
 interface Props {
@@ -47,6 +57,9 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
   const formId = useId();
   const [type, setType] = useState<"study" | "event" | "club">(defaultType);
   const [files, setFiles] = useState<File[]>([]);
+  const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLabel, setLinkLabel] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -84,6 +97,31 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
     setSuggestions([]);
   }
 
+  function addLink() {
+    const url = cleanLinkUrl(linkUrl);
+    if (!url) {
+      setError("Enter a web link starting with https://");
+      return;
+    }
+    const label = linkLabel.replace(/\s+/g, " ").trim();
+    if (containsProfanity(label)) {
+      setError(PROFANITY_MESSAGE);
+      return;
+    }
+    if (links.length >= MAX_LINKS_PER_POST) {
+      setError(`You can add up to ${MAX_LINKS_PER_POST} links.`);
+      return;
+    }
+    if (links.some((l) => l.url === url)) {
+      setError("You already added that link.");
+      return;
+    }
+    setError(null);
+    setLinks([...links, { url, label }]);
+    setLinkUrl("");
+    setLinkLabel("");
+  }
+
   function addFiles(list: FileList | null) {
     if (!list) return;
     const next = [...files];
@@ -118,6 +156,16 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
       return;
     }
     const allTags = tagInput.trim() && tags.length < MAX_SUBJECT_TAGS ? [...tags, tagInput.trim()] : tags;
+    // A link typed but not added yet is included, like a half-typed tag.
+    const pendingUrl = linkUrl.trim() ? cleanLinkUrl(linkUrl) : null;
+    if (linkUrl.trim() && !pendingUrl) {
+      setError("Enter a web link starting with https://, or clear the link box.");
+      return;
+    }
+    const allLinks =
+      pendingUrl && links.length < MAX_LINKS_PER_POST && !links.some((l) => l.url === pendingUrl)
+        ? [...links, { url: pendingUrl, label: linkLabel.trim() }]
+        : links;
     setBusy(true);
     try {
       const uploaded: { pathname: string; name: string }[] = [];
@@ -133,6 +181,8 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
         subjects: allTags,
         semester: String(fd.get("semester") ?? ""),
         clubId: String(fd.get("clubId") ?? ""),
+        links: allLinks,
+        anonymous: type !== "club" && fd.get("anonymous") === "on",
         ownWork: fd.get("ownWork") === "on" ? true : (false as unknown as true),
         files: uploaded,
         event:
@@ -326,6 +376,90 @@ export function NewPostForm({ userId, clubs, semesters, enabledKinds, storageDri
           </ul>
         )}
       </div>
+
+      <fieldset className="mb-4">
+        <legend className="label">Links (optional)</legend>
+        {links.length > 0 && (
+          <ul className="mb-2 space-y-1" aria-label="Added links">
+            {links.map((l, i) => (
+              <li key={l.url} className="card flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                <span className="break-all">
+                  {l.label ? `${l.label} ` : ""}
+                  <span className="text-muted">{l.url}</span>
+                </span>
+                <button type="button" className="btn btn-sm" onClick={() => setLinks(links.filter((_, j) => j !== i))} aria-label={`Remove link ${l.label || l.url}`}>
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]">
+          <div>
+            <label htmlFor="linkUrl" className="sr-only">
+              Link address
+            </label>
+            <input
+              id="linkUrl"
+              type="url"
+              inputMode="url"
+              className="input"
+              value={linkUrl}
+              maxLength={LINK_URL_MAX}
+              disabled={links.length >= MAX_LINKS_PER_POST}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addLink();
+                }
+              }}
+              placeholder="https://..."
+              aria-describedby="links-hint"
+            />
+          </div>
+          <div>
+            <label htmlFor="linkLabel" className="sr-only">
+              Link name
+            </label>
+            <CleanInput
+              id="linkLabel"
+              value={linkLabel}
+              maxLength={LINK_LABEL_MAX}
+              disabled={links.length >= MAX_LINKS_PER_POST}
+              onChange={(e) => setLinkLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addLink();
+                }
+              }}
+              placeholder="Name (optional)"
+            />
+          </div>
+          <button type="button" className="btn" onClick={addLink} disabled={links.length >= MAX_LINKS_PER_POST}>
+            Add link
+          </button>
+        </div>
+        <p id="links-hint" className="hint">
+          Link to official pages, like an exam board&apos;s past papers page. Don&apos;t link to copied exam papers, answers or paid material. Up to{" "}
+          {MAX_LINKS_PER_POST}.
+        </p>
+      </fieldset>
+
+      {type !== "club" && (
+        <div className="mb-4 flex items-start gap-3">
+          <input id="anonymous" name="anonymous" type="checkbox" className="mt-1 h-5 w-5 shrink-0" aria-describedby="anonymous-hint" />
+          <div>
+            <label htmlFor="anonymous" className="text-sm font-medium">
+              Post anonymously
+            </label>
+            <p id="anonymous-hint" className="hint">
+              Other members see &quot;Anonymous&quot; and the post stays off your profile. The admin can still see who posted it.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="mb-6 flex items-start gap-3">
         <input id="ownWork" name="ownWork" type="checkbox" required className="mt-1 h-5 w-5 shrink-0" />

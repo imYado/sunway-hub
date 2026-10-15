@@ -122,6 +122,7 @@ The deploy seed is safe to run every time. It adds:
 - version 1 of the Terms and Privacy Policy
 - the 45 built-in Sunway clubs, only while the clubs table is empty, so clubs the admin deletes don't come back
 - default site settings
+- four past paper directory posts (links to official Cambridge, AUSMAT, ACCA and Sunway Library pages, in `src/content/past-papers.ts`), posted once as anonymous approved posts from the admin account. They're added on the first deploy after the admin has signed in, and deleted ones don't come back.
 
 If `DATABASE_URL` isn't set, both steps are skipped and the build carries on. Preview deploys migrate whatever database their variables point at, so point Preview at a separate Neon branch.
 

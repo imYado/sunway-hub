@@ -36,6 +36,13 @@
       "when": 1791977377998,
       "tag": "0004_schedules_and_study_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792051125501,
+      "tag": "0005_post_links_and_anonymous",
+      "breakpoints": true
     }
   ]
 }

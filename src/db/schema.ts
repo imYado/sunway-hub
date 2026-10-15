@@ -350,6 +350,11 @@ export const clubManagerRequests = pgTable(
   (t) => [index("club_manager_requests_status").on(t.status)],
 );
 
+export interface PostLink {
+  url: string;
+  label: string;
+}
+
 export const posts = pgTable(
   "posts",
   {
@@ -363,6 +368,10 @@ export const posts = pgTable(
     subjectText: text("subject_text").notNull().default(""),
     semester: text("semester"),
     clubId: uuid("club_id").references(() => clubs.id, { onDelete: "set null" }),
+    // External links shared in the post, shown under the description.
+    links: jsonb("links").$type<PostLink[]>().notNull().default([]),
+    // Shown as "Anonymous" to everyone except the poster and the admin.
+    anonymous: boolean("anonymous").notNull().default(false),
     status: postStatusEnum("status").notNull().default("pending"),
     decisionReason: text("decision_reason"),
     decidedAt: ts("decided_at"),
