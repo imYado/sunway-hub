@@ -8,6 +8,8 @@ const SORTS: { value: PostSort; label: string }[] = [
   { value: "top", label: "Top" },
 ];
 
+const TYPE_FILTER_LABEL: Record<PostType, string> = { discussion: "Discussions", study: "Notes", event: "Events", club: "Clubs", market: "Market" };
+
 /** Type filter and Hot / New / Top sort, as links so they work without JavaScript. */
 export function FeedControls({
   base,
@@ -15,12 +17,14 @@ export function FeedControls({
   sort,
   extra = {},
   showTypes = true,
+  types = POST_TYPES,
 }: {
   base: string;
   type?: PostType;
   sort: PostSort;
   extra?: Record<string, string | undefined>;
   showTypes?: boolean;
+  types?: readonly { value: PostType; label: string }[];
 }) {
   const href = (t: PostType | undefined, s: PostSort) => {
     const p = new URLSearchParams(Object.entries({ ...extra, type: t, sort: s }).filter(([, v]) => v) as [string, string][]);
@@ -34,14 +38,14 @@ export function FeedControls({
           <Link href={href(undefined, sort)} className={`btn btn-sm ${!type ? "btn-primary" : ""}`} aria-current={!type ? "page" : undefined}>
             All
           </Link>
-          {POST_TYPES.map((t) => (
+          {types.map((t) => (
             <Link
               key={t.value}
               href={href(t.value, sort)}
               className={`btn btn-sm ${type === t.value ? "btn-primary" : ""}`}
               aria-current={type === t.value ? "page" : undefined}
             >
-              {t.value === "event" ? "Events" : t.value === "club" ? "Clubs" : t.value === "study" ? "Notes" : "Discussions"}
+              {TYPE_FILTER_LABEL[t.value]}
             </Link>
           ))}
         </nav>

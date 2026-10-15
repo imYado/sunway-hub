@@ -57,6 +57,13 @@
       "when": 1792053411108,
       "tag": "0007_drop_helpful_votes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792059066202,
+      "tag": "0008_market_and_messages",
+      "breakpoints": true
     }
   ]
 }

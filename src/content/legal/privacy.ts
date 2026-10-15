@@ -25,6 +25,7 @@ When you use SJ Study we collect:
 - Your profile picture, if you upload one.
 - Content you upload: posts, descriptions, files, images and videos.
 - Your activity on the site: RSVPs, bookmarks, comments, upvotes and downvotes, club follows, reports you submit and messages you send us.
+- Private messages you send and receive, including images in them.
 - Your weekly class timetable, if you add one, and the study groups and plans you make or join. Calendar files you upload are read once and not kept.
 - Technical and security records: a hashed form of your IP address, your browser or device type, and timestamps of sign-ins and actions.
 
@@ -48,7 +49,9 @@ Our legal basis is your consent, which you give when you tick the box at sign-up
 - Your timetable is private. Members of your study groups only see when you are busy or free, never your class names or rooms.
 - Study groups are private: only their members can see the group, its members and its plans.
 - You appear on the contributor leaderboard only if you turn it on in your settings.
-- The site admin can see all data, including your email address and all your content, so they can moderate the site.
+- Private messages are visible only to the two people in the conversation. They are stored encrypted. When you message someone, they always see your name. If you message the poster of an anonymous post, the poster stays anonymous to you unless they choose to show their name.
+- The admin can read a private conversation only after someone in it reports a message, so the report can be checked. Each time the admin opens a reported conversation, it is recorded in the audit log.
+- The site admin can see your email address and the content you post (including who wrote anonymous posts), so they can moderate the site.
 - We do not sell, rent or share your data with anyone for marketing. There are no advertisers.
 
 ## 5. Service providers and storage outside Malaysia
@@ -65,7 +68,9 @@ These providers may store or process data outside Malaysia (for example in Singa
 
 - When you or the admin delete content, it is hidden immediately and permanently erased (database records and files) after 30 days.
 - Security records (such as sign-in records) are kept for up to 90 days.
-- When you delete your account, your profile and personal data are erased promptly. You can choose to delete your posts too, or keep them anonymised as "Deleted user".
+- When you delete your account, your profile is erased from the site promptly. You can choose to delete your posts too, or keep them anonymised as "Deleted user".
+- So that reports about past behaviour can still be handled, the admin keeps a private record of a deleted account's email address, name, username, role and dates. Only the admin can see it. Private messages you sent stay in the other person's conversation, shown as "Deleted user".
+- A private message you remove disappears for both people straight away. Its encrypted copy is kept for 30 days in case it was reported, then permanently erased.
 - A record of moderation actions (the audit log) is kept while the site operates so decisions can be reviewed. It does not contain file contents.
 
 ## 7. Your rights
@@ -82,7 +87,7 @@ To make a request by email, write to **hubsunway@gmail.com** from your Sunway em
 
 ## 8. Security and data breaches
 
-We protect data with encrypted connections, hashed sign-in codes and session tokens, private file storage, server-side access checks and rate limiting. No system is perfectly secure. If a data breach affects your personal data, we will notify affected users and, where required, the Personal Data Protection Commissioner, as soon as practicable.
+We protect data with encrypted connections, hashed sign-in codes and session tokens, encrypted private messages and message images, private file storage, server-side access checks and rate limiting. No system is perfectly secure. If a data breach affects your personal data, we will notify affected users and, where required, the Personal Data Protection Commissioner, as soon as practicable.
 
 ## 9. Cookies
 

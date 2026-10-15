@@ -31,7 +31,7 @@ The site has exactly one admin by design. There is no way to add a second one, s
 4. **Hand over the Gmail account**: new password, new recovery details, 2-step verification moved to the new owner's phone, a new app password, and `SMTP_APP_PASSWORD` updated in Vercel.
 5. **Rotate secrets** in Vercel: `CRON_SECRET`, `OTP_PEPPER` and `SESSION_SECRET`.
    - Before rotating `SESSION_SECRET`, the old admin turns TOTP off in **Admin > Security**, because the new secret can't decrypt the old TOTP key.
-   - Rotating `SESSION_SECRET` signs everyone out, which is expected.
+   - Rotating `SESSION_SECRET` signs everyone out, which is expected. It also makes existing private messages unreadable, so only rotate it if it may have leaked.
 6. **Change `ADMIN_EMAIL`** in Vercel to the new owner's email and redeploy.
    - The old address immediately becomes an ordinary member, or is refused if it isn't a Sunway address.
    - The new admin's previous member account, if any, keeps its posts.

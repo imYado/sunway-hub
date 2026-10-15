@@ -9,6 +9,7 @@ import {
   clubManagerRequests,
   clubs,
   contactMessages,
+  deletedAccounts,
   events,
   postTitleHistory,
   posts,
@@ -25,11 +26,12 @@ import { hasRecentAuth, revokeAllSessions } from "../auth/session";
 import { AppError, NotFoundError, ReauthRequiredError } from "../errors";
 import { invalidateFilterCache } from "../profanity";
 import { deleteComment, describeComment } from "./comments";
+import { deleteMessage, describeMessage } from "./messages";
 import { notify, notifyFollowersOfPost } from "./notifications";
 import { assertAdmin, assertNotAdminTarget } from "./policy";
 import { deleteGroup, describeGroup } from "./groups";
 import { setHidden, type ReportTarget } from "./reports";
-import { assertUsernameAvailable, eraseUser, softDeleteFile } from "./users";
+import { assertUsernameAvailable, eraseUser, identityForAdmin, softDeleteFile } from "./users";
 import { storageStatus } from "./uploads";
 
 /** Sensitive admin actions require the password to have been entered recently. */
@@ -313,17 +315,32 @@ export async function deleteStoredFile(actor: Actor, fileId: string, reason: str
 export async function searchUsers(actor: Actor, q: string) {
   assertAdmin(actor);
   const term = q.trim();
-  const conds: SQL[] = [sql`${users.status} <> 'deleted'`];
+  const conds: SQL[] = [];
   if (term) {
     const like = `%${term.replace(/[%_\\]/g, "\\$&")}%`;
-    conds.push(or(ilike(users.email, like), ilike(users.username, like), ilike(users.displayName, like)) as SQL);
+    // Deleted accounts are found by the email, username or name they had.
+    conds.push(
+      or(
+        ilike(users.email, like),
+        ilike(users.username, like),
+        ilike(users.displayName, like),
+        sql`exists (select 1 from deleted_accounts d where d.user_id = ${users.id} and (d.email ilike ${like} or d.username ilike ${like} or d.display_name ilike ${like}))`,
+      ) as SQL,
+    );
+  } else {
+    conds.push(sql`${users.status} <> 'deleted'`);
   }
-  return db
-    .select()
+  const rows = await db
+    .select({ u: users, archived: deletedAccounts })
     .from(users)
+    .leftJoin(deletedAccounts, eq(deletedAccounts.userId, users.id))
     .where(and(...conds))
     .orderBy(desc(users.createdAt))
     .limit(100);
+  // Deleted accounts show the email, username and name they had.
+  return rows.map(({ u, archived }) =>
+    archived ? { ...u, email: archived.email, username: archived.username, displayName: archived.displayName } : u,
+  );
 }
 
 export async function getUserForAdmin(actor: Actor, userId: string) {
@@ -344,7 +361,8 @@ export async function getUserForAdmin(actor: Actor, userId: string) {
     .where(and(eq(reports.targetType, "user"), eq(reports.targetId, userId)))
     .orderBy(desc(reports.createdAt))
     .limit(50);
-  return { user: u, posts: userPosts, avatar: avatar ?? null, reports: reportsAgainst, isAdminAccount: u.email === env.adminEmail };
+  const identity = u.status === "deleted" ? await identityForAdmin(u.id) : null;
+  return { user: u, identity, posts: userPosts, avatar: avatar ?? null, reports: reportsAgainst, isAdminAccount: u.email === env.adminEmail };
 }
 
 async function loadTarget(userId: string) {
@@ -453,13 +471,27 @@ export async function openReports(actor: Actor) {
       reason: reports.reason,
       note: reports.note,
       createdAt: reports.createdAt,
+      reporterId: reports.reporterId,
       reporter: users.username,
+      reporterStatus: users.status,
     })
     .from(reports)
     .leftJoin(users, eq(users.id, reports.reporterId))
     .where(eq(reports.status, "open"))
     .orderBy(asc(reports.createdAt))
     .limit(200);
+  // Deleted reporters: show who they were from the archive.
+  const reporterLabel = new Map<string, string>();
+  for (const r of rows) {
+    if (r.reporterId && r.reporterStatus === "deleted" && !reporterLabel.has(r.reporterId)) {
+      const who = await identityForAdmin(r.reporterId);
+      reporterLabel.set(r.reporterId, `${who.username ? `@${who.username}` : who.email} (deleted account, ${who.email})`);
+    }
+  }
+  for (const r of rows) {
+    if (r.reporterId && reporterLabel.has(r.reporterId)) r.reporter = reporterLabel.get(r.reporterId)!;
+    else if (r.reporter) r.reporter = `@${r.reporter}`;
+  }
   // Group by target for the queue.
   const groups = new Map<string, { targetType: string; targetId: string; label: string; link: string | null; ownerId: string | null; hidden: boolean; items: typeof rows }>();
   for (const r of rows) {
@@ -480,9 +512,15 @@ export async function openReports(actor: Actor) {
       g.link = c ? `/posts/${c.postId}#comment-${c.id}` : null;
       g.ownerId = c?.authorId ?? null;
       g.hidden = !!c?.hidden;
+    } else if (g.targetType === "message") {
+      const m = await describeMessage(g.targetId);
+      g.label = m ? `Private message: ${m.deletedAt ? "(unsent) " : ""}${m.preview || "(image only)"}` : "Private message (removed)";
+      g.link = m ? `/admin/conversations/${m.conversationId}` : null;
+      g.ownerId = m?.senderId ?? null;
     } else if (g.targetType === "user") {
       const [u] = await db.select().from(users).where(eq(users.id, g.targetId)).limit(1);
-      g.label = u ? `Profile: @${u.username}` : "Profile (removed)";
+      const who = u ? await identityForAdmin(u.id) : null;
+      g.label = who ? `Profile: ${who.username ? `@${who.username}` : "(no username)"} · ${who.email}${who.status === "deleted" ? " (deleted account)" : ""}` : "Profile (removed)";
       g.link = u ? `/admin/users/${u.id}` : null;
       g.ownerId = u?.id ?? null;
       g.hidden = !!u?.hiddenByReports;
@@ -517,6 +555,8 @@ export async function resolveReports(
       await deletePost(actor, targetId, note);
     } else if (targetType === "comment") {
       await deleteComment(actor, targetId, note);
+    } else if (targetType === "message") {
+      await deleteMessage(actor, targetId, note);
     } else if (targetType === "club") {
       const { adminDeleteClub } = await import("./clubs");
       await adminDeleteClub(actor, targetId, note);
@@ -535,6 +575,10 @@ export async function resolveReports(
       const c = await describeComment(targetId);
       if (!c) throw new NotFoundError();
       userId = c.authorId;
+    } else if (targetType === "message") {
+      const m = await describeMessage(targetId);
+      if (!m) throw new NotFoundError();
+      userId = m.senderId;
     } else if (targetType === "club") {
       throw new AppError("Clubs cannot be warned or banned. Remove the club or dismiss the reports.");
     } else if (targetType !== "user") {

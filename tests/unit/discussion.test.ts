@@ -24,7 +24,7 @@ async function quarantine(actor: Actor, name: string, data: Buffer) {
 }
 
 async function approvedPost(actor: Actor, title: string, extra: Partial<Parameters<typeof createPost>[1]> = {}) {
-  const { id } = await createPost(actor, { type: "discussion", title, description: "Original text.", ownWork: true, ...extra });
+  const { id } = await createPost(actor, { type: "discussion", title, description: "Original text.", ...extra });
   await decidePost(admin, id, { decision: "approve" });
   return id;
 }
@@ -52,21 +52,20 @@ describe.skipIf(!hasDb)("discussions, editing, comments and votes", () => {
 
   it("anyone can tag a club, but only managers can post as the club", async () => {
     const [club] = await db.insert(clubs).values({ slug: "chess-club", name: "Chess Club", category: "General Interest" }).returning();
-    const { id } = await createPost(bob, { type: "discussion", title: "Chess meetup this week?", clubId: club.id, ownWork: true });
+    const { id } = await createPost(bob, { type: "discussion", title: "Chess meetup this week?", clubId: club.id });
     expect((await getPostDetail(bob, id)).club?.slug).toBe("chess-club");
-    await expect(createPost(bob, { type: "club", title: "Official chess news", clubId: club.id, ownWork: true })).rejects.toThrow(/managers/);
+    await expect(createPost(bob, { type: "club", title: "Official chess news", clubId: club.id })).rejects.toThrow(/managers/);
   });
 
   it("only the poster can edit; the admin can hide but not edit", async () => {
     const id = await approvedPost(alice, "Editable discussion post");
-    await expect(editPost(bob, id, { title: "Hijacked by bob", ownWork: true })).rejects.toThrow(/own posts/);
-    await expect(editPost(admin, id, { title: "Changed by admin", ownWork: true })).rejects.toThrow(/own posts/);
+    await expect(editPost(bob, id, { title: "Hijacked by bob" })).rejects.toThrow(/own posts/);
+    await expect(editPost(admin, id, { title: "Changed by admin" })).rejects.toThrow(/own posts/);
     await editPost(alice, id, {
       title: "Edited discussion post",
       description: "New text.",
       subjects: ["Food", "Campus"],
       links: [{ url: "https://example.com", label: "" }],
-      ownWork: true,
     });
     const p = await getPostDetail(bob, id);
     expect(p).toMatchObject({ title: "Edited discussion post", description: "New text.", status: "approved" });
@@ -85,7 +84,6 @@ describe.skipIf(!hasDb)("discussions, editing, comments and votes", () => {
       type: "study",
       title: "Notes needing changes",
       subjects: ["CSC1024"],
-      ownWork: true,
       files: [await quarantine(alice, "a.pdf", pdfBytes())],
     });
     await decidePost(admin, id, { decision: "changes", reason: "Add the week number" });
@@ -93,7 +91,6 @@ describe.skipIf(!hasDb)("discussions, editing, comments and votes", () => {
     await editPost(alice, id, {
       title: "Week 3 notes needing changes",
       subjects: ["CSC1024"],
-      ownWork: true,
       keepFileIds: [],
       files: [await quarantine(alice, "b.png", await pngBytes())],
     });
@@ -106,7 +103,7 @@ describe.skipIf(!hasDb)("discussions, editing, comments and votes", () => {
 
   it("threaded comments, edits, votes and deletes", async () => {
     const id = await approvedPost(alice, "Discussion with comments");
-    const pending = await createPost(alice, { type: "discussion", title: "Still pending post", ownWork: true });
+    const pending = await createPost(alice, { type: "discussion", title: "Still pending post" });
     await expect(createComment(bob, { postId: pending.id, body: "Too early" })).rejects.toThrow(/could not find/);
 
     const top = await createComment(bob, { postId: id, body: "First!" });

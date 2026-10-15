@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
   const pathname = String(form.get("pathname") ?? "");
   if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
   try {
-    const purpose = form.get("purpose") === "comment" ? "comment" : "post";
+    const raw = form.get("purpose");
+    const purpose = raw === "comment" || raw === "dm" ? raw : "post";
     await authorizeUpload(actor, { pathname, name: file.name, contentType: file.type, size: file.size }, purpose);
     const finalPath = `${pathname}-${randomToken(6)}`;
     await storage().put(finalPath, Buffer.from(await file.arrayBuffer()), file.type);

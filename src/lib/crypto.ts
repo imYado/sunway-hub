@@ -46,3 +46,28 @@ export function decryptSecret(secret: string, payload: string): string {
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
 }
+
+// Private messages and their images. Same AES-256-GCM scheme, with a separate derived key.
+const MESSAGE_KEY_PURPOSE = "dm-v1";
+
+/** Encrypts bytes as iv (12) + tag (16) + ciphertext. */
+export function encryptBytes(secret: string, data: Buffer, purpose = MESSAGE_KEY_PURPOSE): Buffer {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", deriveKey(secret, purpose), iv);
+  const enc = Buffer.concat([cipher.update(data), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), enc]);
+}
+
+export function decryptBytes(secret: string, payload: Buffer, purpose = MESSAGE_KEY_PURPOSE): Buffer {
+  const decipher = createDecipheriv("aes-256-gcm", deriveKey(secret, purpose), payload.subarray(0, 12));
+  decipher.setAuthTag(payload.subarray(12, 28));
+  return Buffer.concat([decipher.update(payload.subarray(28)), decipher.final()]);
+}
+
+export function encryptText(secret: string, plaintext: string): string {
+  return encryptBytes(secret, Buffer.from(plaintext, "utf8")).toString("base64url");
+}
+
+export function decryptText(secret: string, payload: string): string {
+  return decryptBytes(secret, Buffer.from(payload, "base64url")).toString("utf8");
+}

@@ -40,6 +40,7 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
         post={{
           id: post.id,
           type: post.type,
+          marketKind: post.marketKind,
           title: post.title,
           description: post.description,
           tags: post.subjects.map((s) => s.name),

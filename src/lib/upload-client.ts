@@ -8,7 +8,7 @@ export async function uploadToQuarantine(
   file: File,
   userId: string,
   driver: "vercel" | "local",
-  purpose: "post" | "comment" = "post",
+  purpose: "post" | "comment" | "dm" = "post",
 ): Promise<{ pathname: string; name: string }> {
   const name = safeFileName(file.name);
   const pathname = `quarantine/${userId}/${name.replace(/[^A-Za-z0-9._-]+/g, "_")}`;

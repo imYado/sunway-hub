@@ -61,7 +61,6 @@ describe.skipIf(!hasDb)("link posts and anonymous posts", () => {
       title: "Useful past paper links",
       subjects: ["Past Papers"],
       links: [{ url: "www.example.com/papers", label: "" }, { url: "https://example.org/x", label: "Board page" }],
-      ownWork: true,
     });
     const post = await getPostDetail(alice, id);
     expect(post.links).toEqual([
@@ -72,13 +71,13 @@ describe.skipIf(!hasDb)("link posts and anonymous posts", () => {
 
   it("refuses unsafe links", async () => {
     await expect(
-      createPost(alice, { type: "study", title: "Bad link post", subjects: ["X"], links: [{ url: "javascript:alert(1)", label: "" }], ownWork: true }),
+      createPost(alice, { type: "study", title: "Bad link post", subjects: ["X"], links: [{ url: "javascript:alert(1)", label: "" }] }),
     ).rejects.toThrow(/not a valid web link/);
   });
 
   it("hides the author of anonymous posts from other members only", async () => {
     await db.update(users).set({ teacherVerified: true, showOnLeaderboard: true }).where(eq(users.id, alice.id));
-    const { id } = await createPost(alice, { type: "study", title: "Anonymous directory", subjects: ["Past Papers"], anonymous: true, ownWork: true });
+    const { id } = await createPost(alice, { type: "study", title: "Anonymous directory", subjects: ["Past Papers"], anonymous: true });
     await decidePost(admin, id, { decision: "approve" });
     await votePost(bob, id, 1);
 
@@ -98,7 +97,7 @@ describe.skipIf(!hasDb)("link posts and anonymous posts", () => {
 
   it("does not allow anonymous club posts", async () => {
     await expect(
-      createPost(alice, { type: "club", title: "Anonymous club post", clubId: crypto.randomUUID(), anonymous: true, ownWork: true }),
+      createPost(alice, { type: "club", title: "Anonymous club post", clubId: crypto.randomUUID(), anonymous: true }),
     ).rejects.toThrow(/can't be anonymous/);
   });
 });

@@ -14,7 +14,7 @@ Welcome to SJ Study. By signing in and using the site you agree to these Terms. 
 
 SJ Study is an unofficial, student-run project run by [OWNER NAME]. It is **not affiliated with or endorsed by Sunway University** or the Sunway Group. The Sunway name is used only to describe who the site is for.
 
-SJ Study is free and non-commercial. There are no ads, payments, donations, sponsorships, paid features or marketplace, and you may not use the site to sell or advertise anything.
+SJ Study is free and non-commercial. There are no ads, payments, donations, sponsorships or paid features. Members may use the Market to buy, sell, swap or lend their own personal items to each other (see section 6), but not to run a business or advertise.
 
 ## 2. Who can use SJ Study
 
@@ -40,41 +40,50 @@ Do not upload or post:
 - sexual or violent content;
 - other people's personal data (for example phone numbers, addresses or student IDs);
 - profanity or offensive language;
-- advertising, promotions, or anything offered for sale;
+- advertising or promotions, or items for sale outside the Market;
+- in the Market: anything illegal, weapons, drugs, alcohol, vapes, stolen or counterfeit goods, or completed assignments and other academic work;
 - anything illegal under Malaysian law.
 
 ## 5. Moderation
 
-- Every upload is reviewed by the admin before other members can see it.
+- Every post is reviewed by the admin before other members can see it. Comments and private messages are not reviewed in advance, but can be reported.
 - The admin may reject, remove or hide content, and suspend or ban accounts, without notice, to keep the community safe.
 - Content reported by several members may be hidden automatically while it is reviewed.
 - If you disagree with a decision, email hubsunway@gmail.com with the details and we will look at it again.
 
-## 6. Academic integrity
+
+## 6. Market and private messages
+
+- Market listings are between the members involved. SJ Study is not a party to any deal and is not responsible for items, their condition, or whether a deal goes ahead. Use common sense and meet in safe, public places on campus.
+- Private messages start as a request that the other person must accept. You can decline, block or report any conversation.
+- You can't send messages anonymously. If you message the poster of an anonymous post, they stay anonymous unless they choose to show their name.
+- These Terms and the Community Guidelines apply to private messages too. The admin can read a conversation only after a message in it is reported.
+
+## 7. Academic integrity
 
 SJ Study is for sharing your own study notes and helping each other learn. You remain fully responsible for following Sunway University's own rules, including its academic integrity and assessment policies. Using material from SJ Study does not make it acceptable to submit it as your own work.
 
-## 7. No guarantees
+## 8. No guarantees
 
 SJ Study is provided "as is" and "as available". We do not guarantee that the site will always be available, error-free, or that content shared by members is accurate. Always check important information with your lecturer or official Sunway sources.
 
-## 8. Limited liability
+## 9. Limited liability
 
 To the extent allowed by law, SJ Study and its owner are not liable for any loss or damage arising from your use of the site or from content posted by members.
 
-## 9. Ending your use
+## 10. Ending your use
 
 You can delete your account at any time in Settings. We may suspend or end your access if you break these Terms. Sections 3, 7, 8 and 10 continue to apply after your account ends.
 
-## 10. Governing law
+## 11. Governing law
 
 These Terms are governed by the laws of Malaysia.
 
-## 11. Changes to these Terms
+## 12. Changes to these Terms
 
 We may update these Terms. When we publish a new version, you will be asked to accept it the next time you sign in.
 
-## 12. Contact
+## 13. Contact
 
 Questions about these Terms: **hubsunway@gmail.com**.
 `;

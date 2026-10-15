@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { PageSkeleton } from "@/components/layout/page-skeleton";
 import { EmptyState, PageTitle } from "@/components/ui/empty";
 import { FeedControls, parseType } from "@/components/posts/feed-controls";
+import { HOME_POST_TYPES } from "@/lib/rules";
 import { Pagination, PostList } from "@/components/posts/post-card";
 import { requireMember } from "@/server/actor";
 import { listFeed, parseSort } from "@/server/dal/posts";
@@ -21,7 +22,8 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireMember();
   const sp = await searchParams;
   const page = Number(sp.page ?? "1") || 1;
-  const type = parseType(sp.type);
+  const parsed = parseType(sp.type);
+  const type = parsed === "market" ? undefined : parsed;
   const sort = parseSort(sp.sort, "hot");
   const feed = await listFeed(actor, { page, type, sort });
   const params = new URLSearchParams(Object.entries({ type, sort }).filter(([, v]) => v) as [string, string][]);
@@ -36,7 +38,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
       >
         Home
       </PageTitle>
-      <FeedControls base="/" type={type} sort={sort} />
+      <FeedControls base="/" type={type} sort={sort} types={HOME_POST_TYPES} />
       <PostList
         posts={feed.items}
         path="/"

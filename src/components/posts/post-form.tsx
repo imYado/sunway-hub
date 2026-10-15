@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
@@ -11,8 +12,8 @@ import {
   LINK_LABEL_MAX,
   LINK_URL_MAX,
   MAX_LINKS_PER_POST,
+  MARKET_KINDS,
   MAX_TAGS,
-  OWN_WORK_STATEMENT,
   POST_TYPES,
   TITLE_MAX,
   cleanLinkUrl,
@@ -25,6 +26,7 @@ import { createPostAction, editPostAction } from "@/app/actions/posts";
 export interface EditablePost {
   id: string;
   type: PostType;
+  marketKind: string | null;
   title: string;
   description: string;
   tags: string[];
@@ -180,11 +182,11 @@ export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, sto
         description,
         subjects: allTags,
         semester: String(fd.get("semester") ?? ""),
+        marketKind: type === "market" ? (String(fd.get("marketKind") ?? "") as "sell") : undefined,
         clubId: String(fd.get("clubId") ?? ""),
         links: allLinks,
         anonymous: type !== "club" && fd.get("anonymous") === "on",
         keepFileIds: keptFiles.map((f) => f.id),
-        ownWork: fd.get("ownWork") === "on" ? true : (false as unknown as true),
         files: uploaded,
         event:
           type === "event"
@@ -229,6 +231,27 @@ export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, sto
           ))}
         </div>
       </fieldset>
+      )}
+
+      {type === "market" && (
+        <fieldset className="mb-4">
+          <legend className="label">What are you doing?</legend>
+          <div className="flex flex-wrap gap-4">
+            {MARKET_KINDS.map((k, i) => (
+              <label key={k.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="marketKind"
+                  value={k.value}
+                  required
+                  defaultChecked={post?.marketKind ? post.marketKind === k.value : i === 0}
+                  className="h-4 w-4"
+                />
+                {k.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       )}
 
       <div className="mb-4">
@@ -494,13 +517,6 @@ export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, sto
         </div>
       )}
 
-      <div className="mb-6 flex items-start gap-3">
-        <input id="ownWork" name="ownWork" type="checkbox" required className="mt-1 h-5 w-5 shrink-0" />
-        <label htmlFor="ownWork" className="text-sm">
-          {OWN_WORK_STATEMENT}
-        </label>
-      </div>
-
       <p className="mb-4 text-sm text-muted">
         {editing
           ? "Your changes show as edited. If the admin asked for changes, saving sends the post back for approval."
@@ -510,6 +526,17 @@ export function PostForm({ userId, clubs, allClubs, semesters, enabledKinds, sto
       <button type="submit" className="btn btn-primary" disabled={busy}>
         {busy ? (editing ? "Saving..." : "Submitting...") : editing ? "Save changes" : "Submit for approval"}
       </button>
+      <p className="mt-2 text-xs text-muted">
+        By posting, you confirm you have the right to share this and agree to the{" "}
+        <Link href="/guidelines" target="_blank">
+          Community Guidelines
+        </Link>{" "}
+        and{" "}
+        <Link href="/terms" target="_blank">
+          Terms
+        </Link>
+        .
+      </p>
       {progress && (
         <p role="status" className="mt-2 text-sm text-muted">
           {progress}

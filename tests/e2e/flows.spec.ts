@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { ADMIN_EMAIL, ADMIN_PASSWORD, latestCode, pngFile, ready, signInAdmin, signInMember } from "./helpers";
+import { ADMIN_EMAIL, ADMIN_PASSWORD, latestCode, pngFile, ready, resetRateLimits, signInAdmin, signInMember } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
+test.beforeEach(resetRateLimits);
 
 const ALICE = "alice@imail.sunway.edu.my";
 const BOB = "bob@sunway.edu.my";
@@ -83,7 +84,6 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await alice.getByLabel(/^Tags/).press("Enter");
   await alice.getByLabel("Semester").selectOption("Jan 2026");
   await alice.getByLabel("Attachments (optional)").setInputFiles(await pngFile());
-  await alice.getByLabel(/This is my own work/).check();
   await alice.getByRole("button", { name: "Submit for approval" }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
   postUrl = new URL(alice.url()).pathname;
@@ -139,13 +139,77 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await alice.getByRole("link", { name: "Edit" }).click();
   await ready(alice);
   await alice.getByLabel("Description").fill("My own summary with a diagram, now with an example.");
-  await alice.getByLabel(/This is my own work/).check();
   await alice.getByRole("button", { name: "Save changes" }).click();
   await alice.waitForURL((u) => u.pathname === postUrl);
   await expect(alice.getByText("now with an example")).toBeVisible();
   await expect(alice.getByText(/\(edited/)).toBeVisible();
   await bob.goto("/");
   await expect(bob.getByRole("link", { name: "Week 3 notes on recursion" })).toBeVisible();
+  await Promise.all([alice.close(), bob.close(), admin.close()]);
+});
+
+test("anonymous market listing, message request and image reply", async ({ browser }) => {
+  const alice = await browser.newPage();
+  await signInMember(alice, "carol@imail.sunway.edu.my", "carol_m");
+  await alice.goto("/posts/new?type=market");
+  await ready(alice);
+  await alice.getByRole("radio", { name: "Borrow or lend" }).check();
+  await alice.getByLabel("Title").fill("Lending a graphing calculator");
+  await alice.getByLabel("Post anonymously").check();
+  await alice.getByRole("button", { name: "Submit for approval" }).click();
+  await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
+  const listingUrl = new URL(alice.url()).pathname;
+
+  const admin = await browser.newPage();
+  await signInAdmin(admin);
+  await admin.goto("/admin/queue");
+  await ready(admin);
+  const item = admin.locator("[data-queue-item]", { hasText: "Lending a graphing calculator" });
+  await item.getByRole("button", { name: "Approve" }).click();
+  await expect(item).toHaveCount(0);
+
+  // On the Market page, not on Home.
+  const bob = await browser.newPage();
+  await signInMember(bob, "dave@sunway.edu.my", "dave_k");
+  await bob.goto("/");
+  await expect(bob.getByRole("link", { name: "Lending a graphing calculator" })).toHaveCount(0);
+  await bob.goto("/market");
+  await bob.getByRole("link", { name: "Lending a graphing calculator" }).click();
+  await bob.waitForURL((u) => u.pathname === listingUrl);
+  await ready(bob);
+  await bob.getByRole("link", { name: "Message the poster" }).click();
+  await ready(bob);
+  await bob.getByLabel("Your message").fill("Hi, could I borrow it for Friday's test?");
+  await bob.getByRole("button", { name: "Send request" }).click();
+  await bob.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+  const convUrl = new URL(bob.url()).pathname;
+  await expect(bob.getByRole("heading", { name: "Anonymous poster" })).toBeVisible();
+  await expect(bob.getByText("Your request was sent.")).toBeVisible();
+
+  // Alice accepts without showing her name, then replies with a photo.
+  await alice.goto("/messages");
+  await ready(alice);
+  await expect(alice.getByRole("heading", { name: /Requests/ })).toBeVisible();
+  await alice.goto(convUrl);
+  await ready(alice);
+  await alice.getByRole("button", { name: "Accept and stay anonymous" }).click();
+  await alice.getByLabel("Message", { exact: true }).fill("Sure, here it is.");
+  await alice.locator("input[type=file]").setInputFiles(await pngFile("calculator.png"));
+  await alice.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(alice.getByText("Sure, here it is.")).toBeVisible();
+
+  await bob.goto(convUrl);
+  await ready(bob);
+  await expect(bob.getByText("Sure, here it is.")).toBeVisible();
+  await expect(bob.getByRole("heading", { name: "Anonymous poster" })).toBeVisible();
+  expect(await bob.content()).not.toContain("carol_m");
+  const src = await bob.getByRole("img", { name: "calculator.png" }).getAttribute("src");
+  const img = await bob.request.get(src!);
+  expect(img.status()).toBe(200);
+  expect(img.headers()["content-type"]).toBe("image/png");
+  // Someone outside the conversation gets nothing.
+  expect((await admin.request.get(src!)).status()).toBe(404);
+  expect((await admin.goto(convUrl))?.status()).toBe(404);
   await Promise.all([alice.close(), bob.close(), admin.close()]);
 });
 
@@ -277,7 +341,6 @@ test("delete by admin (with reason) and by poster", async ({ browser }) => {
   await alice.getByLabel("Title").fill("A post I will delete");
   await alice.getByLabel(/^Tags/).fill("MTH1114 Computer Mathematics");
   await alice.getByLabel(/^Tags/).press("Enter");
-  await alice.getByLabel(/This is my own work/).check();
   await alice.getByRole("button", { name: "Submit for approval" }).click();
   await alice.waitForURL(/\/posts\/[0-9a-f-]{36}$/);
   const own = new URL(alice.url()).pathname;
@@ -306,6 +369,8 @@ for (const colorScheme of ["light", "dark"] as const) test(`accessibility (${col
   for (const p of [
     "/",
     "/search",
+    "/market",
+    "/messages",
     "/subjects",
     "/schedule",
     "/schedule/timetable",

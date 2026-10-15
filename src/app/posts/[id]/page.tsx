@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Bookmark, CalendarPlus, Download, Eye, EyeOff, Pencil } from "lucide-react";
+import { Bookmark, CalendarPlus, Download, Eye, EyeOff, MessageCircle, Pencil } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { CleanTextarea } from "@/components/ui/clean-input";
 import { CommentComposer } from "@/components/comments/comment-composer";
@@ -13,7 +13,7 @@ import { PostLinks } from "@/components/posts/post-links";
 import { ReportForm } from "@/components/report-form";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatBytes } from "@/lib/files";
-import { POST_TYPE_LABEL } from "@/lib/rules";
+import { MARKET_KIND_LABEL, POST_TYPE_LABEL } from "@/lib/rules";
 import { env } from "@/lib/env";
 import { bookmarkAction, deletePostAction, hidePostAction, rsvpAction } from "@/app/actions/posts";
 import { requireMember } from "@/server/actor";
@@ -65,7 +65,10 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       )}
 
       <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-        <span className="badge">{POST_TYPE_LABEL[post.type]}</span>
+        <span className="badge">
+          {POST_TYPE_LABEL[post.type]}
+          {post.marketKind && ` · ${MARKET_KIND_LABEL[post.marketKind]}`}
+        </span>
       </div>
       <div className="flex gap-3">
         <VoteControl kind="post" id={post.id} postId={post.id} score={post.score} vote={post.viewerVote} canVote={v.canInteract && !v.isOwner} />
@@ -159,6 +162,11 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+        {v.canInteract && !v.isOwner && !post.author.deleted && (
+          <Link href={`/messages/new?post=${post.id}`} className={`btn btn-sm ${post.type === "market" ? "btn-primary" : ""}`}>
+            <MessageCircle size={14} aria-hidden="true" /> Message {post.author.anonymous ? "the poster" : (post.author.displayName ?? "the poster")}
+          </Link>
+        )}
         {v.canInteract && (
           <ActionForm action={bookmarkAction}>
             <input type="hidden" name="postId" value={post.id} />

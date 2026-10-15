@@ -1,4 +1,6 @@
 import "server-only";
+import { decryptBytes } from "@/lib/crypto";
+import { env } from "@/lib/env";
 import { storage } from "./storage";
 
 function contentDisposition(kind: "inline" | "attachment", name: string): string {
@@ -30,4 +32,27 @@ export async function fileResponse(
   if (obj.size) headers.set("Content-Length", String(obj.size));
   if (obj.contentRange) headers.set("Content-Range", obj.contentRange);
   return new Response(obj.stream, { status: obj.status, headers });
+}
+
+/** Serves an encrypted private-message image after decrypting it. Never cached by shared caches. */
+export async function encryptedImageResponse(file: { storagePath: string; contentType: string; originalName: string }): Promise<Response> {
+  const payload = await storage().readAll(file.storagePath, 20 * 1024 * 1024);
+  if (!payload) return new Response("Not found", { status: 404 });
+  let data: Buffer;
+  try {
+    data = decryptBytes(env.sessionSecret, payload);
+  } catch {
+    return new Response("Not found", { status: 404 });
+  }
+  return new Response(new Uint8Array(data), {
+    headers: {
+      "Content-Type": file.contentType,
+      "Content-Disposition": contentDisposition("inline", file.originalName),
+      "Content-Length": String(data.length),
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; img-src 'self'; sandbox",
+      "Cache-Control": "private, no-store",
+      "Cross-Origin-Resource-Policy": "same-origin",
+    },
+  });
 }

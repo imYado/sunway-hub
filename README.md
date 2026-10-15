@@ -97,7 +97,7 @@ Gmail allows roughly 500 messages a day. That is why every non-urgent notificati
 | `DATABASE_URL` | yes | Neon pooled connection string |
 | `DATABASE_URL_UNPOOLED` | migrations | Neon direct connection string; `db:migrate` falls back to `DATABASE_URL` |
 | `BLOB_READ_WRITE_TOKEN` | yes, on Vercel | Set automatically when the Blob store is connected |
-| `SESSION_SECRET` | yes | Random string of 32+ characters. Signs sessions and encrypts the TOTP secret |
+| `SESSION_SECRET` | yes | Random string of 32+ characters. Signs sessions and encrypts the TOTP secret, private messages and message images |
 | `OTP_PEPPER` | yes | Random string of 32+ characters. Used to hash sign-in codes and rate-limit keys |
 | `ADMIN_EMAIL` | yes | `mohammedalqadhi745@gmail.com`. The only account that can ever be admin |
 | `ALLOWED_EMAIL_DOMAINS` | yes | `imail.sunway.edu.my,sunway.edu.my`. Exact domains only, so subdomains and lookalikes are rejected |
@@ -112,7 +112,7 @@ Generate the secrets with:
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-Changing `SESSION_SECRET` signs everyone out and breaks the stored TOTP secret. If you rotate it, turn TOTP off first and set it up again afterwards.
+Changing `SESSION_SECRET` signs everyone out, breaks the stored TOTP secret and makes existing private messages and their images unreadable. Only rotate it if it has leaked. Turn TOTP off first and set it up again afterwards.
 
 ### 6. Migrations and seed
 

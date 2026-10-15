@@ -64,3 +64,15 @@ export async function pngFile(name = "notes.png", w = 64, h = 48) {
 export async function ready(page: Page) {
   await page.locator("html[data-hydrated]").waitFor();
 }
+
+/** Clears sign-in rate limits between tests: the whole suite signs in from one IP. */
+export async function resetRateLimits() {
+  const { default: pg } = await import("pg");
+  const { e2eEnv } = await import("../../playwright.config");
+  const pool = new pg.Pool({ connectionString: e2eEnv.DATABASE_URL });
+  try {
+    await pool.query("delete from rate_limits");
+  } finally {
+    await pool.end();
+  }
+}

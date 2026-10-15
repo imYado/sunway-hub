@@ -10,6 +10,7 @@ import { HydrationMarker } from "@/components/layout/hydration-marker";
 import { PageInteractions } from "@/components/layout/page-interactions";
 import { getActor } from "@/server/actor";
 import { unreadCount } from "@/server/dal/notifications";
+import { unreadMessageCount } from "@/server/dal/messages";
 import { getSettings } from "@/server/settings";
 
 export const metadata: Metadata = {
@@ -37,9 +38,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let actor = null;
   let settings = null;
   let unread = 0;
+  let unreadMessages = 0;
   try {
     [actor, settings] = await Promise.all([getActor(), getSettings()]);
-    if (actor?.onboarded) unread = await unreadCount(actor);
+    if (actor?.onboarded) [unread, unreadMessages] = await Promise.all([unreadCount(actor), unreadMessageCount(actor)]);
   } catch (err) {
     console.error("Layout data failed:", err instanceof Error ? err.name : "unknown");
   }
@@ -52,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-bg focus:p-2">
           Skip to content
         </a>
-        <SiteHeader actor={actor?.onboarded ? actor : null} unread={unread} />
+        <SiteHeader actor={actor?.onboarded ? actor : null} unread={unread} unreadMessages={unreadMessages} />
         {settings?.announcement && (
           <div role="region" aria-label="Announcement" className="border-b border-line bg-surface">
             <p className="mx-auto max-w-content px-4 py-2 text-sm sm:px-6">{settings.announcement}</p>

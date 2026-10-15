@@ -10,7 +10,7 @@ const payloadSchema = z.object({
   name: z.string().min(1).max(200),
   size: z.number().int().positive(),
   contentType: z.string().max(200),
-  purpose: z.enum(["post", "comment"]).default("post"),
+  purpose: z.enum(["post", "comment", "dm"]).default("post"),
 });
 
 /**
