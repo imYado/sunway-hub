@@ -23,6 +23,7 @@ import {
   deleteStoredFile,
   forceSignOut,
   markMessageHandled,
+  deleteContactMessage,
   reinstateUser,
   removeWord,
   requireRecentAuth,
@@ -330,6 +331,13 @@ export async function publishLegalAction(_: ActionState, fd: FormData): Promise<
 export async function messageHandledAction(_: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
     await markMessageHandled(await admin(), str(fd, "id"));
+    revalidatePath("/admin/messages");
+  });
+}
+
+export async function messageDeleteAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    await deleteContactMessage(await admin(), str(fd, "id"));
     revalidatePath("/admin/messages");
   });
 }

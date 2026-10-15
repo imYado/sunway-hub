@@ -92,17 +92,19 @@ describe.skipIf(!hasDb)("timetables, study groups and plans", () => {
 
   it("members plan things, mark going, and see them on their own schedule", async () => {
     const [g] = await myGroups(alice);
-    const date = addDays(monday, 2);
+    // Plans must be from yesterday onwards, so use a day that's always in range.
+    const date = addDays(klDayKey(), 1);
+    const from = klDayKey();
     await expect(createPlan(carol, g.id, { title: "Library session", date })).rejects.toThrow();
     await expect(createPlan(alice, g.id, { title: "Library session", date, start: "15:00", end: "14:00" })).rejects.toThrow(/after/);
     const planId = await createPlan(alice, g.id, { title: "Library session", date, start: "14:00", end: "16:00", kind: "study" });
     expect(await togglePlanGoing(bob, planId)).toBe(true);
-    const [p] = await myPlans(bob, monday, addDays(monday, 6));
+    const [p] = await myPlans(bob, from, addDays(from, 6));
     expect(p).toMatchObject({ title: "Library session", going: 2, imGoing: true, groupName: "Revision crew" });
     await expect(deletePlan(carol, planId)).rejects.toThrow();
     await expect(deletePlan(bob, planId)).rejects.toThrow();
     await deletePlan(alice, planId);
-    expect(await myPlans(bob, monday, addDays(monday, 6))).toEqual([]);
+    expect(await myPlans(bob, from, addDays(from, 6))).toEqual([]);
   });
 
   it("the owner leaving hands the group over; removed members lose access", async () => {

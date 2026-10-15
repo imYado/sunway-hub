@@ -7,6 +7,10 @@ export function ContactForm({ kind, defaultName, defaultEmail }: { kind: "contac
   return (
     <ActionForm action={contactAction} resetOnSuccess>
       <input type="hidden" name="kind" value={kind} />
+      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+        <label htmlFor={`${kind}-website`}>Leave this empty</label>
+        <input id={`${kind}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" />
+      </div>
       <Field label="Your name" htmlFor={`${kind}-name`}>
         <CleanInput id={`${kind}-name`} name="name" required maxLength={100} defaultValue={defaultName} autoComplete="name" />
       </Field>

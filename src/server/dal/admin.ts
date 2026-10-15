@@ -694,6 +694,14 @@ export async function listMessages(actor: Actor) {
   return db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt)).limit(200);
 }
 
+/** Removes a junk or abusive contact or takedown message for good. */
+export async function deleteContactMessage(actor: Actor, id: string) {
+  assertAdmin(actor);
+  if (!z.string().uuid().safeParse(id).success) throw new NotFoundError();
+  await db.delete(contactMessages).where(eq(contactMessages.id, id));
+  await audit(actor, "message.deleted", { type: "message", id });
+}
+
 export async function markMessageHandled(actor: Actor, id: string) {
   assertAdmin(actor);
   await db.update(contactMessages).set({ handledAt: new Date() }).where(eq(contactMessages.id, id));
