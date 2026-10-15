@@ -10,6 +10,8 @@ import { requireMember } from "@/server/actor";
 import { NotFoundError } from "@/server/errors";
 import { listProfilePosts, type ProfileTab } from "@/server/dal/posts";
 import { getProfile } from "@/server/dal/users";
+import { friendCount, friendState } from "@/server/dal/friends";
+import { FriendButton } from "@/components/friend-button";
 
 export const metadata: Metadata = { title: "Profile" };
 
@@ -29,7 +31,8 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const ownerTabs: ProfileTab[] = ["posts", "pending", "rejected", "bookmarks"];
   const tabs: ProfileTab[] = profile.isOwner ? ownerTabs : profile.viewerIsAdmin ? ["posts", "pending", "rejected"] : ["posts"];
   const tab: ProfileTab = tabs.includes(rawTab as ProfileTab) ? (rawTab as ProfileTab) : "posts";
-  const posts = await listProfilePosts(actor, profile.id, tab);
+  const [posts, friendship, friends] = await Promise.all([listProfilePosts(actor, profile.id, tab), friendState(actor, profile.id), friendCount(profile.id)]);
+  const path = `/u/${profile.username}`;
   const tabLabel = { posts: "Posts", pending: "Pending", rejected: "Rejected", bookmarks: "Bookmarks" } as const;
   const showPending = profile.isOwner && !!profile.avatar.pendingFileId;
 
@@ -68,21 +71,36 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
             )}
             Joined {formatDate(profile.joinedAt)}
           </p>
-          {profile.isOwner && (
-            <Link href="/settings" className="btn btn-sm mt-3">
-              Edit profile
-            </Link>
-          )}
-          {!profile.isOwner && (
-            <Link href={`/messages/new?to=${profile.username}`} className="btn btn-primary btn-sm mr-2 mt-3">
-              Message
-            </Link>
-          )}
-          {profile.viewerIsAdmin && !profile.isOwner && (
-            <Link href={`/admin/users/${profile.id}`} className="btn btn-sm mt-3">
-              Manage in admin
-            </Link>
-          )}
+          <p className="mt-2 text-sm">
+            {profile.isOwner ? (
+              <Link href="/friends">
+                <span className="font-semibold">{friends}</span> friend{friends === 1 ? "" : "s"}
+              </Link>
+            ) : (
+              <>
+                <span className="font-semibold">{friends}</span> friend{friends === 1 ? "" : "s"}
+                {friendship === "friends" && <span className="text-muted"> · You&apos;re friends</span>}
+              </>
+            )}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {profile.isOwner && (
+              <Link href="/settings" className="btn btn-sm">
+                Edit profile
+              </Link>
+            )}
+            {!profile.isOwner && !actor.guest && <FriendButton userId={profile.id} state={friendship} path={path} name={profile.displayName} />}
+            {!profile.isOwner && !actor.guest && (
+              <Link href={`/messages/new?to=${profile.username}`} className="btn btn-sm">
+                Message
+              </Link>
+            )}
+            {profile.viewerIsAdmin && !profile.isOwner && (
+              <Link href={`/admin/users/${profile.id}`} className="btn btn-sm">
+                Manage in admin
+              </Link>
+            )}
+          </div>
           {!profile.isOwner && !actor.guest && <ReportForm targetType="user" targetId={profile.id} />}
         </div>
       </section>

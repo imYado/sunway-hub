@@ -62,7 +62,7 @@ export function SortMenu({ current, options }: { current: string; options: SortO
         role="dialog"
         aria-label="Sort posts"
         aria-modal="false"
-        className={`fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-line bg-bg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 ease-out motion-reduce:transition-none md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-full md:mt-2 md:w-64 md:rounded md:border md:p-2 md:transition-[opacity,transform] md:duration-150 ${
+        className={`fixed inset-x-0 bottom-0 z-50 rounded-t-[16px] border-t border-line bg-bg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 ease-out motion-reduce:transition-none md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-full md:mt-2 md:w-64 md:rounded md:border md:p-2 md:transition-[opacity,transform] md:duration-150 ${
           open ? "translate-y-0 md:opacity-100" : "pointer-events-none invisible translate-y-full md:-translate-y-1 md:opacity-0"
         }`}
       >

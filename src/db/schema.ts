@@ -81,6 +81,7 @@ export const clubCategoryEnum = pgEnum("club_category", [
 ]);
 export const planKindEnum = pgEnum("plan_kind", ["study", "outing", "other"]);
 export const messageKindEnum = pgEnum("message_kind", ["contact", "takedown"]);
+export const friendStatusEnum = pgEnum("friend_status", ["pending", "accepted"]);
 
 // ---------------------------------------------------------------------------
 // Users, auth and sessions
@@ -325,6 +326,30 @@ export const clubFollows = pgTable(
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.clubId, t.userId] })],
+);
+
+/**
+ * Friendships are mutual: one person asks, the other accepts. There is one row
+ * per pair, whoever asked first; unfriending deletes it for both.
+ */
+export const friendships = pgTable(
+  "friendships",
+  {
+    requesterId: uuid("requester_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addresseeId: uuid("addressee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: friendStatusEnum("status").notNull().default("pending"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    acceptedAt: ts("accepted_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.requesterId, t.addresseeId] }),
+    uniqueIndex("friendships_pair").on(sql`least(${t.requesterId}, ${t.addresseeId})`, sql`greatest(${t.requesterId}, ${t.addresseeId})`),
+    index("friendships_addressee").on(t.addresseeId, t.status),
+  ],
 );
 
 export const clubManagers = pgTable(

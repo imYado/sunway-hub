@@ -120,11 +120,11 @@ export async function clubUpcomingEvents(actor: Actor, clubId: string) {
   return listEvents(actor, { from: new Date(), clubId, limit: 10 });
 }
 
-export async function clubRecentPosts(actor: Actor, clubId: string): Promise<PostCard[]> {
+/** Posts in a club: anything members tagged with the club, or only the managers' official posts. */
+export async function clubRecentPosts(actor: Actor, clubId: string, opts: { officialOnly?: boolean; page?: number } = {}) {
   const [club] = await db.select({ slug: clubs.slug }).from(clubs).where(eq(clubs.id, clubId)).limit(1);
-  if (!club) return [];
-  const r = await searchPosts(actor, { club: club.slug, sort: "new" });
-  return r.items.slice(0, 10);
+  if (!club) return { items: [] as PostCard[], page: 1, pages: 1, total: 0 };
+  return searchPosts(actor, { club: club.slug, sort: "new", type: opts.officialOnly ? "club" : undefined, page: opts.page ?? 1 });
 }
 
 export async function toggleFollowClub(actor: Actor, clubId: string): Promise<boolean> {

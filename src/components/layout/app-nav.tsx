@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bell,
+  Contact,
   BookOpen,
   Calendar,
   CalendarDays,
@@ -60,6 +61,7 @@ function Badge({ n }: { n?: number }) {
 
 function accessibleLabel(item: Item) {
   if (!item.count) return item.label;
+  if (item.href === "/friends") return `${item.label}, ${item.count} request${item.count === 1 ? "" : "s"}`;
   return item.href === "/notifications" ? `${item.label}, ${item.count} unread` : `${item.label}, ${item.count} new`;
 }
 
@@ -88,6 +90,7 @@ function MenuLinks({ items }: { items: Item[] }) {
           <Link href={n.href} className={MENU_ROW}>
             <n.icon size={20} aria-hidden="true" />
             {n.label}
+            {n.count ? <span className="ml-auto rounded-full bg-ink px-2 text-xs font-semibold leading-5 text-on-ink">{countText(n.count)}</span> : null}
           </Link>
         </li>
       ))}
@@ -156,7 +159,19 @@ function useScrollingDown(): [boolean, (v: boolean) => void] {
  * Facebook / Instagram style navigation: a bar along the bottom on phones and a
  * sidebar on the left on bigger screens. The profile button is your own picture.
  */
-export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser | null; guest: boolean; unread: number; unreadMessages: number }) {
+export function AppNav({
+  user,
+  guest,
+  unread,
+  unreadMessages,
+  friendRequests = 0,
+}: {
+  user: NavUser | null;
+  guest: boolean;
+  unread: number;
+  unreadMessages: number;
+  friendRequests?: number;
+}) {
   const pathname = usePathname() ?? "/";
   const [scrollingDown, setScrollingDown] = useScrollingDown();
   // A new page always starts with the bars showing.
@@ -176,17 +191,18 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
 
   const messages: Item = { href: "/messages", label: "Messages", icon: MessageCircle, count: unreadMessages };
   const notifications: Item = { href: "/notifications", label: "Notifications", icon: Bell, count: unread };
+  const friends: Item = { href: "/friends", label: "Friends", icon: Contact, count: friendRequests };
   const profileHref = user ? `/u/${user.username}` : "/login";
   const profileActive = !!user && isActive(pathname, profileHref);
 
   const sidebar: Item[] = user
-    ? [ALL.home, ALL.search, ALL.market, ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, messages, notifications, ALL.create]
+    ? [ALL.home, ALL.search, ALL.market, ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, friends, messages, notifications, ALL.create]
     : [ALL.home, ALL.search, ALL.market, ALL.tags, ALL.clubs, ALL.events];
   const sidebarMore: Item[] = user ? [ALL.leaderboard, ALL.settings, ...(user.isAdmin ? [ALL.admin] : [])] : [ALL.leaderboard];
 
   const bottom: Item[] = user ? [ALL.home, ALL.search, ALL.create, ALL.market] : [ALL.home, ALL.search, ALL.market, ALL.clubs];
   const phoneMore: Item[] = user
-    ? [ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, ALL.leaderboard, ALL.settings, ...(user.isAdmin ? [ALL.admin] : [])]
+    ? [friends, ALL.tags, ALL.clubs, ALL.events, ALL.schedule, ALL.groups, ALL.leaderboard, ALL.settings, ...(user.isAdmin ? [ALL.admin] : [])]
     : [ALL.tags, ALL.events, ALL.leaderboard];
 
   const everything: Item[] = [...bottom, ...sidebar, ...sidebarMore, ...phoneMore, messages, notifications];
@@ -229,7 +245,7 @@ export function AppNav({ user, guest, unread, unreadMessages }: { user: NavUser 
                       <Badge n={n.count} />
                     </span>
                     <span className="sr-only lg:not-sr-only">{n.label}</span>
-                    {n.count ? <span className="sr-only">{`, ${countText(n.count)} ${n.href === "/notifications" ? "unread" : "new"}`}</span> : null}
+                    {n.count ? <span className="sr-only">{`, ${countText(n.count)} ${n.href === "/notifications" ? "unread" : n.href === "/friends" ? "requests" : "new"}`}</span> : null}
                   </Link>
                 </li>
               );

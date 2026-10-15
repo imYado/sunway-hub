@@ -11,6 +11,7 @@ import { PageInteractions } from "@/components/layout/page-interactions";
 import { GUEST_COOKIE, getActor } from "@/server/actor";
 import { unreadCount } from "@/server/dal/notifications";
 import { hasApprovedAvatar } from "@/server/dal/users";
+import { incomingFriendRequestCount } from "@/server/dal/friends";
 import { unreadMessageCount } from "@/server/dal/messages";
 import { getSettings } from "@/server/settings";
 
@@ -41,10 +42,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let unread = 0;
   let unreadMessages = 0;
   let hasAvatar = false;
+  let friendRequests = 0;
   try {
     [actor, settings] = await Promise.all([getActor(), getSettings()]);
     if (actor?.onboarded) {
-      [unread, unreadMessages, hasAvatar] = await Promise.all([unreadCount(actor), unreadMessageCount(actor), hasApprovedAvatar(actor.id)]);
+      [unread, unreadMessages, hasAvatar, friendRequests] = await Promise.all([
+        unreadCount(actor),
+        unreadMessageCount(actor),
+        hasApprovedAvatar(actor.id),
+        incomingFriendRequestCount(actor),
+      ]);
     }
   } catch (err) {
     console.error("Layout data failed:", err instanceof Error ? err.name : "unknown");
@@ -64,7 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-bg focus:p-2">
           Skip to content
         </a>
-        <AppNav user={navUser} guest={guest} unread={unread} unreadMessages={unreadMessages} />
+        <AppNav user={navUser} guest={guest} unread={unread} unreadMessages={unreadMessages} friendRequests={friendRequests} />
         <div className={`flex flex-1 flex-col ${withNav ? "pb-16 md:pb-0 md:pl-20 lg:pl-60" : ""}`}>
           {guest && (
             <div role="region" aria-label="Guest mode" className="border-b border-line bg-surface">

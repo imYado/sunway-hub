@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { ChatNotice, PrivacyChatNotice } from "@/components/messages/chat-notice";
 import { StartConversationForm } from "@/components/messages/start-form";
+import { Avatar } from "@/components/ui/avatar";
+import { FriendButton } from "@/components/friend-button";
 import { requireMember } from "@/server/actor";
 import { NotFoundError } from "@/server/errors";
+import { friendState, type FriendState } from "@/server/dal/friends";
 import { getPostDetail } from "@/server/dal/posts";
 import { getProfile } from "@/server/dal/users";
 
@@ -12,7 +17,10 @@ export const metadata: Metadata = { title: "New message" };
 export default async function NewMessagePage({ searchParams }: { searchParams: Promise<{ to?: string; post?: string }> }) {
   const actor = await requireMember();
   const sp = await searchParams;
-  let toLabel: string;
+  let name: string;
+  let username: string | null = null;
+  let userId: string | null = null;
+  let hasAvatar = false;
   let postTitle: string | null = null;
   let anonymous = false;
   try {
@@ -21,11 +29,19 @@ export default async function NewMessagePage({ searchParams }: { searchParams: P
       if (post.viewer.isOwner) notFound();
       postTitle = post.title;
       anonymous = post.author.anonymous && !actor.isAdmin;
-      toLabel = anonymous ? "the anonymous poster" : (post.author.displayName ?? `@${post.author.username}`);
+      name = anonymous ? "Anonymous poster" : (post.author.displayName ?? `@${post.author.username}`);
+      if (!anonymous && post.author.id && post.author.username) {
+        userId = post.author.id;
+        username = post.author.username;
+        hasAvatar = post.author.hasAvatar;
+      }
     } else if (sp.to) {
       const profile = await getProfile(actor, sp.to);
       if (profile.isOwner) notFound();
-      toLabel = profile.displayName ?? `@${profile.username}`;
+      name = profile.displayName;
+      username = profile.username;
+      userId = profile.id;
+      hasAvatar = !!profile.avatar.approvedFileId;
     } else {
       notFound();
     }
@@ -33,20 +49,50 @@ export default async function NewMessagePage({ searchParams }: { searchParams: P
     if (err instanceof NotFoundError) notFound();
     throw err;
   }
+  const state: FriendState = userId ? await friendState(actor, userId) : "none";
+  const friends = state === "friends";
+  const path = `/messages/new?${sp.post ? `post=${sp.post}` : `to=${sp.to}`}`;
+
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-2 text-xl font-semibold">Message {toLabel}</h1>
-      {postTitle && (
-        <p className="mb-4 text-muted">
-          About <Link href={`/posts/${sp.post}`}>{postTitle}</Link>
-        </p>
-      )}
-      <ul className="surface mb-4 list-disc space-y-1 p-4 pl-8 text-sm">
-        <li>They&apos;ll see your name. Messages can&apos;t be sent anonymously.</li>
-        <li>This is a request: you can send more, including images, once they accept.</li>
-        {anonymous && <li>The poster stays anonymous to you unless they choose to show their name.</li>}
-      </ul>
-      <StartConversationForm to={sp.post ? undefined : sp.to} postId={sp.post} />
+    <div className="mx-auto flex max-w-2xl flex-col">
+      <header className="mb-2 flex items-center gap-3 border-b border-line pb-3">
+        <Link href="/messages" aria-label="Back to messages" className="flex h-10 w-10 items-center justify-center rounded-full text-ink hover:bg-surface">
+          <ArrowLeft size={22} aria-hidden="true" />
+        </Link>
+        <Avatar userId={userId ?? ""} name={name} hasImage={hasAvatar} anonymous={anonymous} decorative size={40} />
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold">{username ? <Link href={`/u/${username}`}>{name}</Link> : name}</h1>
+          {username && <p className="truncate text-sm text-muted">@{username}</p>}
+        </div>
+      </header>
+
+      <div className="py-4">
+        {postTitle && (
+          <ChatNotice title="About a post">
+            <Link href={`/posts/${sp.post}`}>{postTitle}</Link>
+          </ChatNotice>
+        )}
+        {friends ? (
+          <ChatNotice title="You're friends">Say hi! Your message goes straight to {name}.</ChatNotice>
+        ) : (
+          <ChatNotice title="This will be a message request">
+            <p>
+              {anonymous ? "The poster" : `${name} isn't your friend yet, so they`} will only see your message if they accept it. Until then you can&apos;t
+              send anything else, including images.
+            </p>
+            <p className="mt-2">They&apos;ll see your name. Messages can&apos;t be sent anonymously.</p>
+            {anonymous && <p className="mt-2">The poster stays anonymous to you unless they choose to show their name.</p>}
+            {userId && state !== "self" && (
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <FriendButton userId={userId} state={state} path={path} name={name} />
+              </div>
+            )}
+          </ChatNotice>
+        )}
+        <PrivacyChatNotice />
+      </div>
+
+      <StartConversationForm to={sp.post ? undefined : sp.to} postId={sp.post} request={!friends} />
     </div>
   );
 }
