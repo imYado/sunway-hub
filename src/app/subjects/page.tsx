@@ -7,7 +7,7 @@ import { listSubjects } from "@/server/dal/posts";
 export const metadata: Metadata = { title: "Tags" };
 
 export default async function SubjectsPage() {
-  await requireMember();
+  await requireMember({ guestOk: true });
   const subjects = (await listSubjects()).filter((s) => Number(s.posts) > 0);
   return (
     <div>

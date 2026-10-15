@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Search" };
 type SP = { q?: string; type?: string; subject?: string; semester?: string; teacher?: string; club?: string; sort?: string; page?: string };
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const sp = await searchParams;
   const filters: SearchFilters = {
     q: sp.q?.slice(0, 100),

@@ -324,6 +324,7 @@ export async function searchUsers(actor: Actor, q: string) {
         ilike(users.email, like),
         ilike(users.username, like),
         ilike(users.displayName, like),
+        ilike(users.claimedSunwayEmail, like),
         sql`exists (select 1 from deleted_accounts d where d.user_id = ${users.id} and (d.email ilike ${like} or d.username ilike ${like} or d.display_name ilike ${like}))`,
       ) as SQL,
     );
@@ -379,6 +380,16 @@ export async function setTeacherVerified(actor: Actor, userId: string, verified:
   await db.update(users).set({ teacherVerified: verified }).where(eq(users.id, userId));
   await audit(actor, verified ? "user.teacher_verify" : "user.teacher_unverify", { type: "user", id: userId });
   if (verified) await notify([userId], { kind: "decision", title: "Your teacher badge was verified", link: "/settings" });
+}
+
+/** Confirms that a member who signed up with another email really owns the Sunway address they gave. */
+export async function setSunwayVerified(actor: Actor, userId: string) {
+  assertAdmin(actor);
+  const u = await loadTarget(userId);
+  if (u.sunwayVerified) return;
+  await db.update(users).set({ sunwayVerified: true }).where(eq(users.id, userId));
+  await audit(actor, "user.sunway_verify", { type: "user", id: userId }, null, { claimed: u.claimedSunwayEmail });
+  await notify([userId], { kind: "decision", title: "Your Sunway account is verified. You can now use the Market and messages.", link: "/" });
 }
 
 export async function setRoleLabel(actor: Actor, userId: string, role: "student" | "teacher" | "other") {

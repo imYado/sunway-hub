@@ -139,6 +139,7 @@ export interface ProfileView {
   pronouns: "he" | "she" | null;
   role: "student" | "teacher" | "other";
   teacherBadge: "verified" | "pending" | null;
+  notSunway: boolean;
   email: string | null;
   emailPublic: boolean;
   joinedAt: Date;
@@ -161,7 +162,8 @@ export function buildProfileView(actor: Actor, u: UserRow, avatar: typeof userAv
     role: u.roleLabel,
     // Public sees "Verified teacher" only after admin verification; owner/admin also see "pending".
     teacherBadge: u.roleLabel === "teacher" ? (u.teacherVerified ? "verified" : privileged ? "pending" : null) : null,
-    email: privileged || u.emailPublic ? u.email : null,
+    notSunway: !u.sunwayVerified,
+    email: privileged || (u.emailPublic && !actor.guest) ? u.email : null,
     emailPublic: u.emailPublic,
     joinedAt: u.createdAt,
     avatar: {

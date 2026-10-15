@@ -8,7 +8,7 @@ import { SiteFooter } from "@/components/layout/footer";
 import { SiteHeader } from "@/components/layout/header";
 import { HydrationMarker } from "@/components/layout/hydration-marker";
 import { PageInteractions } from "@/components/layout/page-interactions";
-import { getActor } from "@/server/actor";
+import { GUEST_COOKIE, getActor } from "@/server/actor";
 import { unreadCount } from "@/server/dal/notifications";
 import { unreadMessageCount } from "@/server/dal/messages";
 import { getSettings } from "@/server/settings";
@@ -45,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   } catch (err) {
     console.error("Layout data failed:", err instanceof Error ? err.name : "unknown");
   }
+  const guest = !actor && c.get(GUEST_COOKIE)?.value === "1";
   const maintenance =
     !!settings?.maintenanceMode && !actor?.isAdmin && !ALWAYS_AVAILABLE.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
@@ -54,7 +55,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-bg focus:p-2">
           Skip to content
         </a>
-        <SiteHeader actor={actor?.onboarded ? actor : null} unread={unread} unreadMessages={unreadMessages} />
+        <SiteHeader actor={actor?.onboarded ? actor : null} guest={guest} unread={unread} unreadMessages={unreadMessages} />
+        {guest && (
+          <div role="region" aria-label="Guest mode" className="border-b border-line bg-surface">
+            <p className="mx-auto max-w-content px-4 py-2 text-sm sm:px-6">
+              You&apos;re browsing as a guest, so you can look around but not post, comment or message.{" "}
+              <a href="/login">Sign in</a>
+            </p>
+          </div>
+        )}
         {settings?.announcement && (
           <div role="region" aria-label="Announcement" className="border-b border-line bg-surface">
             <p className="mx-auto max-w-content px-4 py-2 text-sm sm:px-6">{settings.announcement}</p>

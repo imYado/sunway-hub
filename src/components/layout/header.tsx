@@ -13,7 +13,19 @@ const NAV = [
   { href: "/study-groups", label: "Study groups" },
 ];
 
-export function SiteHeader({ actor, unread, unreadMessages = 0 }: { actor: Actor | null; unread: number; unreadMessages?: number }) {
+const GUEST_NAV = NAV.filter((n) => n.href !== "/schedule" && n.href !== "/study-groups");
+
+export function SiteHeader({
+  actor,
+  guest = false,
+  unread,
+  unreadMessages = 0,
+}: {
+  actor: Actor | null;
+  guest?: boolean;
+  unread: number;
+  unreadMessages?: number;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg">
       <div className="mx-auto flex max-w-content items-center gap-6 px-4 py-3 sm:px-6">
@@ -100,7 +112,43 @@ export function SiteHeader({ actor, unread, unreadMessages = 0 }: { actor: Actor
             </div>
           </>
         )}
-        {!actor && (
+        {!actor && guest && (
+          <>
+            <nav aria-label="Main" className="hidden flex-1 items-center gap-6 text-sm md:flex">
+              {GUEST_NAV.map((n) => (
+                <Link key={n.href} href={n.href} className="text-ink transition-opacity duration-100 hover:no-underline hover:opacity-60">
+                  {n.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
+              <Link href="/search" className="btn btn-sm" aria-label="Search">
+                <Search size={16} aria-hidden="true" />
+              </Link>
+              <details className="relative md:hidden" data-popup>
+                <summary className="btn btn-sm cursor-pointer list-none" aria-label="Menu">
+                  <Menu size={16} aria-hidden="true" />
+                </summary>
+                <div className="absolute right-0 z-40 mt-2 w-60 rounded border border-line bg-bg p-2 text-sm">
+                  <ul className="flex flex-col">
+                    {GUEST_NAV.map((n) => (
+                      <li key={n.href}>
+                        <Link href={n.href} className="block rounded px-3 py-2 text-ink hover:bg-surface">
+                          {n.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
+              <a href="/login" className="btn btn-primary btn-sm">
+                Sign in
+              </a>
+            </div>
+          </>
+        )}
+        {!actor && !guest && (
           <div className="ml-auto">
             <ThemeToggle />
           </div>

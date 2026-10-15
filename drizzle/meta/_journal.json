@@ -64,6 +64,13 @@
       "when": 1792059066202,
       "tag": "0008_market_and_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792063318129,
+      "tag": "0009_unverified_accounts",
+      "breakpoints": true
     }
   ]
 }

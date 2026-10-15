@@ -28,7 +28,7 @@ export interface CommentView {
   /** Deleted comments with replies stay as a "[deleted]" placeholder so the thread still reads. */
   deleted: boolean;
   hidden: boolean;
-  author: { id: string; username: string | null; displayName: string | null; deleted: boolean; isPoster: boolean; anonymous: boolean };
+  author: { id: string; username: string | null; displayName: string | null; deleted: boolean; isPoster: boolean; anonymous: boolean; notSunway: boolean };
   files: { id: string; name: string; kind: string; size: number; width: number | null; height: number | null }[];
   viewer: { vote: VoteValue | null; isOwner: boolean; canEdit: boolean; canDelete: boolean; canVote: boolean };
 }
@@ -63,6 +63,7 @@ export async function listComments(actor: Actor, postId: string): Promise<Commen
       username: users.username,
       displayName: users.displayName,
       authorStatus: users.status,
+      authorSunway: users.sunwayVerified,
     })
     .from(comments)
     .innerJoin(users, eq(users.id, comments.authorId))
@@ -83,7 +84,7 @@ export async function listComments(actor: Actor, postId: string): Promise<Commen
   const live = new Set(rows.filter((r) => !r.c.deletedAt).map((r) => r.c.parentId));
   const postOpen = canInteract(actor, post);
   const out: CommentView[] = [];
-  for (const { c, username, displayName, authorStatus } of rows) {
+  for (const { c, username, displayName, authorStatus, authorSunway } of rows) {
     const isOwner = c.authorId === actor.id;
     const deleted = !!c.deletedAt;
     // Deleted comments with no live replies are left out entirely (the admin still sees them).
@@ -105,7 +106,7 @@ export async function listComments(actor: Actor, postId: string): Promise<Commen
       hidden: c.hiddenByReports,
       author:
         redacted || masked
-          ? { id: "", username: null, displayName: null, deleted: false, isPoster: masked, anonymous: masked }
+          ? { id: "", username: null, displayName: null, deleted: false, isPoster: masked, anonymous: masked, notSunway: false }
           : {
               id: c.authorId,
               username: authorDeleted ? null : username,
@@ -113,6 +114,7 @@ export async function listComments(actor: Actor, postId: string): Promise<Commen
               deleted: authorDeleted,
               isPoster,
               anonymous: isPoster && post.anonymous,
+              notSunway: !authorDeleted && !(isPoster && post.anonymous) && !authorSunway,
             },
       files: redacted
         ? []

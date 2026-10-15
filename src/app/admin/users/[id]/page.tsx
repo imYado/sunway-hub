@@ -71,6 +71,12 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
           </dd>
         </div>
         <div>
+          <dt className="text-muted">Sunway email</dt>
+          <dd className="break-all">
+            {u.sunwayVerified ? "Verified" : `Not verified. Says it is ${u.claimedSunwayEmail ?? "(not given)"}`}
+          </dd>
+        </div>
+        <div>
           <dt className="text-muted">Role</dt>
           <dd>
             {u.roleLabel}
@@ -142,6 +148,7 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
                 ))}
               </select>
             </Op>
+            {!u.sunwayVerified && <Op userId={u.id} op="verify_sunway" label="Mark Sunway email as verified" variant="primary" />}
             {u.roleLabel === "teacher" &&
               (u.teacherVerified ? (
                 <Op userId={u.id} op="unverify_teacher" label="Remove teacher badge" />

@@ -19,6 +19,7 @@ export function AuthorName({ author }: { author: PostCardData["author"] }) {
     <span>
       <Link href={`/u/${author.username}`}>{author.displayName ?? `@${author.username}`}</Link>
       {author.verifiedTeacher && <span className="badge ml-2">Verified teacher</span>}
+      {author.notSunway && <span className="badge ml-2">Not verified as Sunway</span>}
       {author.anonymous && <span className="badge ml-2">Shown as Anonymous</span>}
     </span>
   );

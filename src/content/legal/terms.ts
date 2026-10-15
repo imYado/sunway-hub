@@ -18,7 +18,8 @@ SJ Study is free and non-commercial. There are no ads, payments, donations, spon
 
 ## 2. Who can use SJ Study
 
-- You must be a current Sunway student, teacher or staff member with a valid Sunway email address.
+- You must be a current Sunway student, teacher or staff member with a valid Sunway email address. If you sign in with another email because our codes can't reach your Sunway email, your account shows as "not verified" and cannot use the Market or start private messages until the admin confirms your Sunway address.
+- Guests may browse without an account but cannot post, comment, vote or message.
 - One account per person. Do not share your account or sign-in codes.
 - You are responsible for activity on your account. Sign out on shared devices and tell us at hubsunway@gmail.com if you think your account has been misused.
 

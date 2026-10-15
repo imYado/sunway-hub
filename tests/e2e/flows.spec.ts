@@ -38,7 +38,7 @@ test("admin first-time sign-in: code, create password, then password sign-in", a
   await page.getByRole("button", { name: "Continue" }).click();
   const code = await latestCode(ADMIN_EMAIL, since);
   await page.getByLabel("6-digit code").fill(code);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Create your password" })).toBeVisible();
   await page.getByLabel("New password").fill("password123");
   await expect(page.getByRole("button", { name: "Save password" })).toBeDisabled();
@@ -146,6 +146,48 @@ test("post upload -> approval -> visible to other members", async ({ browser }) 
   await bob.goto("/");
   await expect(bob.getByRole("link", { name: "Week 3 notes on recursion" })).toBeVisible();
   await Promise.all([alice.close(), bob.close(), admin.close()]);
+});
+
+test("when the code doesn't arrive: guest browsing and signing in with another email", async ({ browser }) => {
+  // Guest: can read the approved post, but not post, message or open private pages.
+  const guestCtx = await browser.newContext();
+  const guest = await guestCtx.newPage();
+  await guest.goto("/login");
+  await ready(guest);
+  await guest.getByLabel("Email").fill("guestie@imail.sunway.edu.my");
+  await guest.getByRole("button", { name: "Continue" }).click();
+  await expect(guest.getByText("Check your junk or spam folder")).toBeVisible();
+  await guest.getByRole("button", { name: "Continue as a guest" }).click();
+  await expect(guest.getByRole("region", { name: "Guest mode" })).toBeVisible();
+  await guest.goto(postUrl);
+  await expect(guest.getByRole("link", { name: "Sign in", exact: true }).first()).toBeVisible();
+  await expect(guest.getByPlaceholder("What do you think?")).toHaveCount(0);
+  await guest.goto("/messages");
+  await expect(guest).toHaveURL(/\/login/);
+  await guestCtx.close();
+
+  // Another email: signs in, shows as not verified, can't post in the Market.
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto("/login");
+  await ready(page);
+  await page.getByLabel("Email").fill("21000002@imail.sunway.edu.my");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Sign in with another email" }).click();
+  const since = Date.now() - 1000;
+  await page.getByLabel("Other email").fill("frank.personal@gmail.com");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("6-digit code").fill(await latestCode("frank.personal@gmail.com", since));
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Welcome to SJ Study" })).toBeVisible();
+  await page.getByLabel("Full name").fill("Frank Personal");
+  await page.getByLabel("Username").fill("frank_p");
+  await page.getByLabel(/I have read and accept/).check();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  await page.goto("/u/frank_p");
+  await expect(page.getByText("Not verified as Sunway")).toBeVisible();
+  await ctx.close();
 });
 
 test("anonymous market listing, message request and image reply", async ({ browser }) => {

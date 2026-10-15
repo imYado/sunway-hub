@@ -102,6 +102,7 @@ Gmail allows roughly 500 messages a day. That is why every non-urgent notificati
 | `ADMIN_EMAIL` | yes | `mohammedalqadhi745@gmail.com`. The only account that can ever be admin |
 | `ALLOWED_EMAIL_DOMAINS` | yes | `imail.sunway.edu.my,sunway.edu.my`. Exact domains only, so subdomains and lookalikes are rejected |
 | `RESEND_API_KEY`, `EMAIL_FROM` | recommended | Resend API key and sender, for example `"SJ Study <noreply@sjstudy.booktabib.com>"`. Used first when set. University mail servers may block codes sent from Gmail |
+| _(no setting)_ | - | When the Sunway code doesn't arrive, the code screen offers: email the admin from the uni address, sign in with another email (account marked not verified, no Market or new messages until the admin clicks "Mark Sunway email as verified" in Admin > Users), or continue as a read-only guest |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | recommended | Adds "Sign in with your Sunway Microsoft account", which needs no email. Register an app in Microsoft Entra ID (accounts in any organizational directory) with redirect URI `<APP_URL>/api/auth/microsoft/callback`. Only Sunway's directories are accepted (`src/lib/microsoft.ts`) |
 | `SMTP_USER`, `SMTP_APP_PASSWORD`, `SMTP_FROM` | yes, unless Resend is set | Gmail settings from step 4. Used as the fallback when Resend is set |
 | `CRON_SECRET` | yes | Random string. Vercel Cron sends it as a Bearer token |

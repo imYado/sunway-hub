@@ -9,7 +9,7 @@ import { ClubLogo } from "@/components/club-logo";
 export const metadata: Metadata = { title: "Clubs" };
 
 export default async function ClubsPage({ searchParams }: { searchParams: Promise<{ q?: string; category?: string }> }) {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const sp = await searchParams;
   const clubs = await listClubs(actor, { q: sp.q, category: sp.category });
   return (

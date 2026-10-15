@@ -35,10 +35,12 @@ function buildCsp(nonce: string): string {
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   const hasSession = !!req.cookies.get(SESSION_COOKIE)?.value;
+  // "Continue as a guest": read-only browsing. Pages and routes decide what a guest may see.
+  const isGuest = req.cookies.get("sh_guest")?.value === "1";
 
   // Cheap first gate only. The real session check happens on the server for every page,
   // action and API route (see src/server/actor.ts).
-  if (!hasSession && !isPublic(pathname)) {
+  if (!hasSession && !isGuest && !isPublic(pathname)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Please sign in." }, { status: 401 });
     }

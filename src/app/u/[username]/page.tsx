@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Profile" };
 const ROLE = { student: "Student", teacher: "Teacher", other: "Member" } as const;
 
 export default async function ProfilePage({ params, searchParams }: { params: Promise<{ username: string }>; searchParams: Promise<{ tab?: string }> }) {
-  const actor = await requireMember();
+  const actor = await requireMember({ guestOk: true });
   const { username } = await params;
   const { tab: rawTab } = await searchParams;
   let profile;
@@ -56,6 +56,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
             <span className="badge">{ROLE[profile.role]}</span>
             {profile.teacherBadge === "verified" && <span className="badge border-success text-success">Verified teacher</span>}
             {profile.teacherBadge === "pending" && <span className="badge">Teacher (pending verification)</span>}
+            {profile.notSunway && <span className="badge">Not verified as Sunway</span>}
           </div>
           {profile.bio && <p className="mt-3 whitespace-pre-wrap break-words">{profile.bio}</p>}
           <p className="mt-2 text-sm text-muted">
@@ -82,7 +83,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
               Manage in admin
             </Link>
           )}
-          {!profile.isOwner && <ReportForm targetType="user" targetId={profile.id} />}
+          {!profile.isOwner && !actor.guest && <ReportForm targetType="user" targetId={profile.id} />}
         </div>
       </section>
 
